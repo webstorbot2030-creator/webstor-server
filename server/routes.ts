@@ -164,6 +164,50 @@ export async function registerRoutes(
     res.sendStatus(204);
   });
 
+  // === Users Management ===
+  app.get("/api/admin/users", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const users = await storage.getAllUsers();
+    res.json(users.map(u => ({ ...u, password: undefined })));
+  });
+
+  app.patch("/api/admin/users/:id", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const { role, balance, active, fullName } = req.body;
+    const updateData: any = {};
+    if (role !== undefined) updateData.role = role;
+    if (balance !== undefined) updateData.balance = balance;
+    if (active !== undefined) updateData.active = active;
+    if (fullName !== undefined) updateData.fullName = fullName;
+    const user = await storage.updateUser(Number(req.params.id), updateData);
+    res.json({ ...user, password: undefined });
+  });
+
+  // === Service Group & Service Toggle ===
+  app.patch("/api/service-groups/:id", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const { active, name, note, image, inputType } = req.body;
+    const updateData: any = {};
+    if (active !== undefined) updateData.active = active;
+    if (name !== undefined) updateData.name = name;
+    if (note !== undefined) updateData.note = note;
+    if (image !== undefined) updateData.image = image;
+    if (inputType !== undefined) updateData.inputType = inputType;
+    const group = await storage.updateServiceGroup(Number(req.params.id), updateData);
+    res.json(group);
+  });
+
+  app.patch("/api/services/:id", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const { active, name, price } = req.body;
+    const updateData: any = {};
+    if (active !== undefined) updateData.active = active;
+    if (name !== undefined) updateData.name = name;
+    if (price !== undefined) updateData.price = price;
+    const service = await storage.updateService(Number(req.params.id), updateData);
+    res.json(service);
+  });
+
   // === Settings ===
   app.get(api.settings.get.path, async (req, res) => {
     const settings = await storage.getSettings();
