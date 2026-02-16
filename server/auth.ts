@@ -43,13 +43,20 @@ export function setupAuth(app: Express) {
   app.use(passport.session());
 
   passport.use(
-    new LocalStrategy({ usernameField: "phoneNumber" }, async (phoneNumber, password, done) => {
-      const user = await storage.getUserByPhoneNumber(phoneNumber);
+    new LocalStrategy({ usernameField: "identifier" }, async (identifier, password, done) => {
+      let user;
+      if (identifier.includes("@")) {
+        user = await storage.getUserByEmail(identifier);
+      } else {
+        user = await storage.getUserByPhoneNumber(identifier);
+      }
       if (!user || !(await comparePasswords(password, user.password))) {
         return done(null, false);
-      } else {
-        return done(null, user);
       }
+      if (!user.active) {
+        return done(null, false);
+      }
+      return done(null, user);
     }),
   );
 
@@ -61,21 +68,35 @@ export function setupAuth(app: Express) {
 
   app.post("/api/register", async (req, res, next) => {
     try {
-      const existingUser = await storage.getUserByPhoneNumber(req.body.phoneNumber);
-      if (existingUser) {
-        return res.status(400).send("رقم الهاتف مسجل مسبقاً");
+      const { fullName, phoneNumber, email, password } = req.body;
+
+      if (!phoneNumber && !email) {
+        return res.status(400).json({ message: "يجب إدخال رقم الهاتف أو البريد الإلكتروني" });
       }
 
-      if (req.body.email) {
-        const existingEmail = await storage.getUserByEmail(req.body.email);
-        if (existingEmail) {
-          return res.status(400).send("البريد الإلكتروني مسجل مسبقاً");
+      if (!fullName || !password) {
+        return res.status(400).json({ message: "الاسم وكلمة المرور مطلوبان" });
+      }
+
+      if (phoneNumber) {
+        const existingPhone = await storage.getUserByPhoneNumber(phoneNumber);
+        if (existingPhone) {
+          return res.status(400).json({ message: "رقم الهاتف مسجل مسبقاً" });
         }
       }
 
-      const hashedPassword = await hashPassword(req.body.password);
+      if (email) {
+        const existingEmail = await storage.getUserByEmail(email);
+        if (existingEmail) {
+          return res.status(400).json({ message: "البريد الإلكتروني مسجل مسبقاً" });
+        }
+      }
+
+      const hashedPassword = await hashPassword(password);
       const user = await storage.createUser({
-        ...req.body,
+        fullName,
+        phoneNumber: phoneNumber || null,
+        email: email || null,
         password: hashedPassword,
         role: "user",
       });
@@ -89,8 +110,17 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/login", passport.authenticate("local"), (req, res) => {
-    res.status(200).json(req.user);
+  app.post("/api/login", (req, res, next) => {
+    passport.authenticate("local", (err: any, user: any) => {
+      if (err) return next(err);
+      if (!user) {
+        return res.status(401).json({ message: "البريد/رقم الهاتف أو كلمة المرور غير صحيحة" });
+      }
+      req.login(user, (err) => {
+        if (err) return next(err);
+        res.status(200).json(user);
+      });
+    })(req, res, next);
   });
 
   app.post("/api/logout", (req, res, next) => {

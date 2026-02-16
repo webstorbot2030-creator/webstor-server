@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useAllOrders, useUpdateOrderStatus } from "@/hooks/use-orders";
 import { useCategories, useCreateCategory, useDeleteCategory, useServices, useCreateService, useDeleteService, useAds, useCreateAd, useDeleteAd, useBanks, useCreateBank, useDeleteBank, useSettings, useUpdateSettings, useServiceGroups, useCreateServiceGroup, useDeleteServiceGroup, useAdminUsers, useUpdateUser, useUpdateServiceGroup, useUpdateService } from "@/hooks/use-store";
 import { Loader2, Trash2, Plus, Check, X, LayoutDashboard, ShoppingBag, Package, ListTree, Megaphone, Landmark, Settings, ExternalLink, ShieldAlert, Users, Power, Image, Link, Eye, EyeOff, UserCog, Wallet, BarChart3, Download, Filter, TrendingUp, Clock, UserPlus, DollarSign, Activity } from "lucide-react";
@@ -245,7 +245,7 @@ function UsersManager() {
     if (!users) return [];
     if (!searchQuery) return users;
     return users.filter((u: any) =>
-      u.fullName.includes(searchQuery) || u.phoneNumber.includes(searchQuery)
+      u.fullName.includes(searchQuery) || (u.phoneNumber && u.phoneNumber.includes(searchQuery)) || (u.email && u.email.includes(searchQuery))
     );
   }, [users, searchQuery]);
 
@@ -321,7 +321,7 @@ function UsersManager() {
                   <div>
                     <h4 className="font-bold text-white text-lg">{u.fullName}</h4>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-400">
-                      <span className="font-mono">{u.phoneNumber}</span>
+                      <span className="font-mono">{u.phoneNumber || u.email || '-'}</span>
                       <span className="text-teal-400 font-bold flex items-center gap-1"><Wallet className="w-3.5 h-3.5" /> {(u.balance || 0).toLocaleString()} ر.ي</span>
                       {u.createdAt && <span>{format(new Date(u.createdAt), "yyyy/MM/dd")}</span>}
                     </div>

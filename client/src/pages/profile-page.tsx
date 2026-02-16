@@ -82,23 +82,27 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-xs text-slate-400 flex items-center gap-1">
-                  <Phone className="w-3 h-3" /> رقم الهاتف
-                </label>
-                <div className="bg-black/30 border border-white/5 rounded-xl p-3 text-white font-mono" dir="ltr" data-testid="text-profile-phone">
-                  {user.phoneNumber}
+              {user.phoneNumber && (
+                <div className="space-y-2">
+                  <label className="text-xs text-slate-400 flex items-center gap-1">
+                    <Phone className="w-3 h-3" /> رقم الهاتف
+                  </label>
+                  <div className="bg-black/30 border border-white/5 rounded-xl p-3 text-white font-mono" dir="ltr" data-testid="text-profile-phone">
+                    {user.phoneNumber}
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <div className="space-y-2">
-                <label className="text-xs text-slate-400 flex items-center gap-1">
-                  <Mail className="w-3 h-3" /> البريد الإلكتروني
-                </label>
-                <div className="bg-black/30 border border-white/5 rounded-xl p-3 text-white" dir="ltr" data-testid="text-profile-email">
-                  {(user as any).email || "غير محدد"}
+              {(user as any).email && (
+                <div className="space-y-2">
+                  <label className="text-xs text-slate-400 flex items-center gap-1">
+                    <Mail className="w-3 h-3" /> البريد الإلكتروني
+                  </label>
+                  <div className="bg-black/30 border border-white/5 rounded-xl p-3 text-white" dir="ltr" data-testid="text-profile-email">
+                    {(user as any).email}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="space-y-2">
                 <label className="text-xs text-slate-400 flex items-center gap-1">

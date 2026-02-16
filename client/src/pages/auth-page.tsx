@@ -13,15 +13,18 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 const loginSchema = z.object({
-  phoneNumber: z.string().min(1, "رقم الهاتف مطلوب"),
+  identifier: z.string().min(1, "البريد الإلكتروني أو رقم الهاتف مطلوب"),
   password: z.string().min(1, "كلمة المرور مطلوبة"),
 });
 
 const registerSchema = z.object({
   fullName: z.string().min(4, "الاسم الرباعي مطلوب"),
-  phoneNumber: z.string().min(9, "رقم الهاتف يجب أن يكون 9 أرقام على الأقل"),
+  phoneNumber: z.string().optional().or(z.literal("")),
   email: z.string().email("البريد الإلكتروني غير صحيح").optional().or(z.literal("")),
   password: z.string().min(6, "كلمة المرور يجب أن تكون 6 أحرف على الأقل"),
+}).refine(data => (data.phoneNumber && data.phoneNumber.length >= 9) || (data.email && data.email.length > 0), {
+  message: "يجب إدخال رقم الهاتف أو البريد الإلكتروني على الأقل",
+  path: ["email"],
 });
 
 export default function AuthPage() {
@@ -37,7 +40,7 @@ export default function AuthPage() {
 
   const loginForm = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { phoneNumber: "", password: "" },
+    defaultValues: { identifier: "", password: "" },
   });
 
   const registerForm = useForm<z.infer<typeof registerSchema>>({
@@ -82,12 +85,12 @@ export default function AuthPage() {
                 <form onSubmit={loginForm.handleSubmit(onLogin)} className="space-y-4">
                   <FormField
                     control={loginForm.control}
-                    name="phoneNumber"
+                    name="identifier"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>رقم الهاتف</FormLabel>
+                        <FormLabel>البريد الإلكتروني أو رقم الهاتف</FormLabel>
                         <FormControl>
-                          <Input placeholder="77xxxxxxx" {...field} className="bg-black/20 border-white/10 h-12 text-lg" dir="ltr" data-testid="input-login-phone" />
+                          <Input placeholder="email@example.com أو 77xxxxxxx" {...field} className="bg-black/20 border-white/10 h-12 text-lg" dir="ltr" data-testid="input-login-identifier" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -136,25 +139,32 @@ export default function AuthPage() {
                   />
                   <FormField
                     control={registerForm.control}
-                    name="phoneNumber"
+                    name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>رقم الهاتف</FormLabel>
+                        <FormLabel className="flex items-center gap-1">
+                          <Mail className="w-4 h-4" />
+                          البريد الإلكتروني
+                        </FormLabel>
                         <FormControl>
-                          <Input placeholder="77xxxxxxx" {...field} className="bg-black/20 border-white/10 h-12" dir="ltr" data-testid="input-register-phone" />
+                          <Input type="email" placeholder="email@example.com" {...field} className="bg-black/20 border-white/10 h-12" dir="ltr" data-testid="input-register-email" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+                  <div className="text-center text-sm text-slate-400">أو</div>
                   <FormField
                     control={registerForm.control}
-                    name="email"
+                    name="phoneNumber"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>البريد الإلكتروني (اختياري)</FormLabel>
+                        <FormLabel className="flex items-center gap-1">
+                          <Phone className="w-4 h-4" />
+                          رقم الهاتف
+                        </FormLabel>
                         <FormControl>
-                          <Input type="email" placeholder="email@example.com" {...field} className="bg-black/20 border-white/10 h-12" dir="ltr" data-testid="input-register-email" />
+                          <Input placeholder="77xxxxxxx" {...field} className="bg-black/20 border-white/10 h-12" dir="ltr" data-testid="input-register-phone" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
