@@ -134,6 +134,19 @@ export const apiTokens = pgTable("api_tokens", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// === NOTIFICATIONS TABLE ===
+
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  type: text("type").notNull().default("info"),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  isRead: boolean("is_read").default(false),
+  relatedOrderId: integer("related_order_id").references(() => orders.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // === ACCOUNTING TABLES ===
 
 export const accounts = pgTable("accounts", {
@@ -238,6 +251,12 @@ export const ordersRelations = relations(orders, ({ one }) => ({
 
 export const usersRelations = relations(users, ({ many }) => ({
   orders: many(orders),
+  notifications: many(notifications),
+}));
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, { fields: [notifications.userId], references: [users.id] }),
+  order: one(orders, { fields: [notifications.relatedOrderId], references: [orders.id] }),
 }));
 
 export const apiProvidersRelations = relations(apiProviders, ({ many }) => ({
@@ -347,6 +366,11 @@ export type JournalLine = typeof journalLines.$inferSelect;
 export type InsertJournalLine = z.infer<typeof insertJournalLineSchema>;
 export type FundTransaction = typeof fundTransactions.$inferSelect;
 export type InsertFundTransaction = z.infer<typeof insertFundTransactionSchema>;
+
+// Notification schemas
+export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 
 // API Integration schemas
 export const insertApiProviderSchema = createInsertSchema(apiProviders).omit({ id: true, createdAt: true });

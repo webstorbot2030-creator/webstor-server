@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAllOrders, useUpdateOrderStatus } from "@/hooks/use-orders";
 import { useCategories, useCreateCategory, useDeleteCategory, useServices, useCreateService, useDeleteService, useAds, useCreateAd, useDeleteAd, useBanks, useCreateBank, useDeleteBank, useSettings, useUpdateSettings, useServiceGroups, useCreateServiceGroup, useDeleteServiceGroup, useAdminUsers, useUpdateUser, useUpdateServiceGroup, useUpdateService } from "@/hooks/use-store";
-import { Loader2, Trash2, Plus, Check, X, LayoutDashboard, ShoppingBag, Package, ListTree, Megaphone, Landmark, Settings, ExternalLink, ShieldAlert, Users, Power, Image, Link, Eye, EyeOff, UserCog, Wallet } from "lucide-react";
+import { Loader2, Trash2, Plus, Check, X, LayoutDashboard, ShoppingBag, Package, ListTree, Megaphone, Landmark, Settings, ExternalLink, ShieldAlert, Users, Power, Image, Link, Eye, EyeOff, UserCog, Wallet, BarChart3, Download, Filter } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
@@ -93,6 +93,10 @@ export default function AdminPage() {
                     <Settings className="w-4 h-4" />
                     <span>الإعدادات</span>
                   </TabsTrigger>
+                  <TabsTrigger value="reports" className="data-[state=active]:bg-primary data-[state=active]:text-white px-4 py-2 rounded-xl transition-all flex gap-2 items-center text-xs">
+                    <BarChart3 className="w-4 h-4" />
+                    <span>التقارير</span>
+                  </TabsTrigger>
                 </TabsList>
               </div>
 
@@ -116,6 +120,9 @@ export default function AdminPage() {
               </TabsContent>
               <TabsContent value="settings" className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
                 <StoreSettingsManager />
+              </TabsContent>
+              <TabsContent value="reports" className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+                <OrderReportsManager />
               </TabsContent>
             </Tabs>
           </div>
@@ -781,5 +788,189 @@ function StoreSettingsManager() {
         </form>
       </CardContent>
     </Card>
+  );
+}
+
+function OrderReportsManager() {
+  const [status, setStatus] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [userId, setUserId] = useState("");
+  const [groupId, setGroupId] = useState("");
+  const { data: users } = useAdminUsers();
+  const { data: groups } = useServiceGroups();
+
+  const params = new URLSearchParams();
+  if (status && status !== "all") params.set("status", status);
+  if (fromDate) params.set("fromDate", fromDate);
+  if (toDate) params.set("toDate", toDate);
+  if (userId && userId !== "all") params.set("userId", userId);
+  if (groupId && groupId !== "all") params.set("serviceGroupId", groupId);
+  const queryString = params.toString();
+  const url = `/api/admin/reports/orders${queryString ? `?${queryString}` : ""}`;
+
+  const { data: report, isLoading } = useQuery<{ orders: any[]; summary: any }>({
+    queryKey: ["/api/admin/reports/orders", status, fromDate, toDate, userId, groupId],
+    queryFn: async () => {
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("فشل جلب التقرير");
+      return res.json();
+    },
+  });
+
+  const statusBadge = (s: string) => {
+    const map: Record<string, string> = {
+      pending: "bg-yellow-500/20 text-yellow-400 border-yellow-500/20",
+      processing: "bg-blue-500/20 text-blue-400 border-blue-500/20",
+      completed: "bg-green-500/20 text-green-400 border-green-500/20",
+      rejected: "bg-red-500/20 text-red-400 border-red-500/20",
+    };
+    const labels: Record<string, string> = { pending: "معلق", processing: "قيد المعالجة", completed: "مكتمل", rejected: "مرفوض" };
+    return <Badge variant="outline" className={`${map[s] || ""} text-[10px]`}>{labels[s] || s}</Badge>;
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card className="bg-slate-900 border-white/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="w-5 h-5 text-primary" />
+            فلترة التقارير
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div className="space-y-1">
+              <label className="text-xs text-slate-400">الحالة</label>
+              <Select value={status} onValueChange={setStatus}>
+                <SelectTrigger className="bg-black/20 border-white/10 h-10" data-testid="select-report-status">
+                  <SelectValue placeholder="الكل" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">الكل</SelectItem>
+                  <SelectItem value="pending">معلق</SelectItem>
+                  <SelectItem value="processing">قيد المعالجة</SelectItem>
+                  <SelectItem value="completed">مكتمل</SelectItem>
+                  <SelectItem value="rejected">مرفوض</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-slate-400">من تاريخ</label>
+              <Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="bg-black/20 border-white/10 h-10" data-testid="input-report-from" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-slate-400">إلى تاريخ</label>
+              <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="bg-black/20 border-white/10 h-10" data-testid="input-report-to" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-slate-400">المستخدم</label>
+              <Select value={userId} onValueChange={setUserId}>
+                <SelectTrigger className="bg-black/20 border-white/10 h-10" data-testid="select-report-user">
+                  <SelectValue placeholder="الكل" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">الكل</SelectItem>
+                  {users?.map((u: any) => (
+                    <SelectItem key={u.id} value={String(u.id)}>{u.fullName}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-slate-400">المجموعة</label>
+              <Select value={groupId} onValueChange={setGroupId}>
+                <SelectTrigger className="bg-black/20 border-white/10 h-10" data-testid="select-report-group">
+                  <SelectValue placeholder="الكل" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">الكل</SelectItem>
+                  {groups?.map((g: any) => (
+                    <SelectItem key={g.id} value={String(g.id)}>{g.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex gap-2 mt-4">
+            <Button variant="outline" className="border-white/10 text-xs" onClick={() => { setStatus(""); setFromDate(""); setToDate(""); setUserId(""); setGroupId(""); }} data-testid="button-reset-filters">
+              مسح الفلاتر
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {report?.summary && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card className="bg-slate-900 border-white/5">
+            <CardContent className="p-4 text-center">
+              <p className="text-2xl font-bold text-white" data-testid="text-total-orders">{report.summary.totalOrders}</p>
+              <p className="text-xs text-slate-400 mt-1">إجمالي الطلبات</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-slate-900 border-yellow-500/20">
+            <CardContent className="p-4 text-center">
+              <p className="text-2xl font-bold text-yellow-400" data-testid="text-pending-count">{report.summary.pendingCount}</p>
+              <p className="text-xs text-slate-400 mt-1">معلقة</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-slate-900 border-green-500/20">
+            <CardContent className="p-4 text-center">
+              <p className="text-2xl font-bold text-green-400" data-testid="text-completed-count">{report.summary.completedCount}</p>
+              <p className="text-xs text-slate-400 mt-1">مكتملة</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-slate-900 border-white/5">
+            <CardContent className="p-4 text-center">
+              <p className="text-2xl font-bold text-primary" data-testid="text-total-revenue">{Number(report.summary.totalRevenue || 0).toLocaleString()} ر.ي</p>
+              <p className="text-xs text-slate-400 mt-1">إجمالي الإيرادات</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      <Card className="bg-slate-900 border-white/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-primary" />
+            نتائج التقرير ({report?.orders?.length || 0} طلب)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex justify-center py-12"><Loader2 className="animate-spin w-8 h-8 text-primary" /></div>
+          ) : !report?.orders?.length ? (
+            <div className="text-center py-12 text-slate-500">لا توجد طلبات بهذه الفلاتر</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-white/5 text-right">
+                    <th className="p-3 text-slate-400 font-medium text-xs">#</th>
+                    <th className="p-3 text-slate-400 font-medium text-xs">المستخدم</th>
+                    <th className="p-3 text-slate-400 font-medium text-xs">الخدمة</th>
+                    <th className="p-3 text-slate-400 font-medium text-xs">السعر</th>
+                    <th className="p-3 text-slate-400 font-medium text-xs">الحالة</th>
+                    <th className="p-3 text-slate-400 font-medium text-xs">التاريخ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.orders.map((o: any) => (
+                    <tr key={o.id} className="border-b border-white/5 hover:bg-white/5 transition-colors" data-testid={`row-report-order-${o.id}`}>
+                      <td className="p-3 text-white font-mono text-xs">{o.id}</td>
+                      <td className="p-3 text-white text-xs">{o.user?.fullName || "-"}</td>
+                      <td className="p-3 text-white text-xs">{o.service?.name || "-"}</td>
+                      <td className="p-3 text-primary text-xs font-medium">{Number(o.service?.price || 0).toLocaleString()} ر.ي</td>
+                      <td className="p-3">{statusBadge(o.status)}</td>
+                      <td className="p-3 text-slate-400 text-[11px]">{o.createdAt ? format(new Date(o.createdAt), "yyyy/MM/dd HH:mm") : "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
