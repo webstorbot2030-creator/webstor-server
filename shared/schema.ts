@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, date, numeric } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -78,6 +78,75 @@ export const settings = pgTable("settings", {
   adminWhatsapp: text("admin_whatsapp"),
 });
 
+// === ACCOUNTING TABLES ===
+
+export const accounts = pgTable("accounts", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(),
+  nameAr: text("name_ar").notNull(),
+  type: text("type").notNull(), // asset, liability, equity, revenue, expense
+  parentId: integer("parent_id"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const funds = pgTable("funds", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  fundType: text("fund_type").notNull(), // cash, bank
+  accountId: integer("account_id").references(() => accounts.id),
+  bankId: integer("bank_id").references(() => banks.id),
+  balance: numeric("balance", { precision: 15, scale: 2 }).default("0"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const accountingPeriods = pgTable("accounting_periods", {
+  id: serial("id").primaryKey(),
+  year: integer("year").notNull(),
+  month: integer("month"),
+  periodType: text("period_type").notNull().default("monthly"), // monthly, yearly
+  status: text("status").notNull().default("open"), // open, closed
+  closedAt: timestamp("closed_at"),
+  closedBy: integer("closed_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const journalEntries = pgTable("journal_entries", {
+  id: serial("id").primaryKey(),
+  entryNumber: text("entry_number").notNull(),
+  entryDate: timestamp("entry_date").notNull().defaultNow(),
+  description: text("description").notNull(),
+  sourceType: text("source_type").notNull().default("manual"), // manual, order, transfer, adjustment, closing
+  sourceId: integer("source_id"),
+  periodId: integer("period_id").references(() => accountingPeriods.id),
+  totalDebit: numeric("total_debit", { precision: 15, scale: 2 }).default("0"),
+  totalCredit: numeric("total_credit", { precision: 15, scale: 2 }).default("0"),
+  createdBy: integer("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const journalLines = pgTable("journal_lines", {
+  id: serial("id").primaryKey(),
+  entryId: integer("entry_id").references(() => journalEntries.id).notNull(),
+  accountId: integer("account_id").references(() => accounts.id).notNull(),
+  debit: numeric("debit", { precision: 15, scale: 2 }).default("0"),
+  credit: numeric("credit", { precision: 15, scale: 2 }).default("0"),
+  description: text("description"),
+  fundId: integer("fund_id").references(() => funds.id),
+});
+
+export const fundTransactions = pgTable("fund_transactions", {
+  id: serial("id").primaryKey(),
+  fundId: integer("fund_id").references(() => funds.id).notNull(),
+  transactionType: text("transaction_type").notNull(), // deposit, withdraw, transfer_in, transfer_out
+  amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
+  description: text("description"),
+  relatedEntryId: integer("related_entry_id").references(() => journalEntries.id),
+  relatedOrderId: integer("related_order_id").references(() => orders.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // === RELATIONS ===
 
 export const categoriesRelations = relations(categories, ({ many }) => ({
@@ -113,6 +182,36 @@ export const ordersRelations = relations(orders, ({ one }) => ({
 
 export const usersRelations = relations(users, ({ many }) => ({
   orders: many(orders),
+}));
+
+export const accountsRelations = relations(accounts, ({ one, many }) => ({
+  parent: one(accounts, { fields: [accounts.parentId], references: [accounts.id] }),
+  journalLines: many(journalLines),
+  funds: many(funds),
+}));
+
+export const fundsRelations = relations(funds, ({ one, many }) => ({
+  account: one(accounts, { fields: [funds.accountId], references: [accounts.id] }),
+  bank: one(banks, { fields: [funds.bankId], references: [banks.id] }),
+  transactions: many(fundTransactions),
+}));
+
+export const journalEntriesRelations = relations(journalEntries, ({ one, many }) => ({
+  period: one(accountingPeriods, { fields: [journalEntries.periodId], references: [accountingPeriods.id] }),
+  createdByUser: one(users, { fields: [journalEntries.createdBy], references: [users.id] }),
+  lines: many(journalLines),
+}));
+
+export const journalLinesRelations = relations(journalLines, ({ one }) => ({
+  entry: one(journalEntries, { fields: [journalLines.entryId], references: [journalEntries.id] }),
+  account: one(accounts, { fields: [journalLines.accountId], references: [accounts.id] }),
+  fund: one(funds, { fields: [journalLines.fundId], references: [funds.id] }),
+}));
+
+export const fundTransactionsRelations = relations(fundTransactions, ({ one }) => ({
+  fund: one(funds, { fields: [fundTransactions.fundId], references: [funds.id] }),
+  entry: one(journalEntries, { fields: [fundTransactions.relatedEntryId], references: [journalEntries.id] }),
+  order: one(orders, { fields: [fundTransactions.relatedOrderId], references: [orders.id] }),
 }));
 
 // === BASE SCHEMAS ===
@@ -151,6 +250,28 @@ export type InsertAd = z.infer<typeof insertAdSchema>;
 
 export type Setting = typeof settings.$inferSelect;
 export type InsertSetting = z.infer<typeof insertSettingsSchema>;
+
+// Accounting schemas
+export const insertAccountSchema = createInsertSchema(accounts).omit({ id: true, createdAt: true });
+export const insertFundSchema = createInsertSchema(funds).omit({ id: true, createdAt: true });
+export const insertAccountingPeriodSchema = createInsertSchema(accountingPeriods).omit({ id: true, closedAt: true, closedBy: true, createdAt: true });
+export const insertJournalEntrySchema = createInsertSchema(journalEntries).omit({ id: true, createdAt: true });
+export const insertJournalLineSchema = createInsertSchema(journalLines).omit({ id: true });
+export const insertFundTransactionSchema = createInsertSchema(fundTransactions).omit({ id: true, createdAt: true });
+
+// Accounting types
+export type Account = typeof accounts.$inferSelect;
+export type InsertAccount = z.infer<typeof insertAccountSchema>;
+export type Fund = typeof funds.$inferSelect;
+export type InsertFund = z.infer<typeof insertFundSchema>;
+export type AccountingPeriod = typeof accountingPeriods.$inferSelect;
+export type InsertAccountingPeriod = z.infer<typeof insertAccountingPeriodSchema>;
+export type JournalEntry = typeof journalEntries.$inferSelect;
+export type InsertJournalEntry = z.infer<typeof insertJournalEntrySchema>;
+export type JournalLine = typeof journalLines.$inferSelect;
+export type InsertJournalLine = z.infer<typeof insertJournalLineSchema>;
+export type FundTransaction = typeof fundTransactions.$inferSelect;
+export type InsertFundTransaction = z.infer<typeof insertFundTransactionSchema>;
 
 // Request types
 export type LoginRequest = { phoneNumber: string; password: string };
