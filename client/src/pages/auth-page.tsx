@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Loader2, LogIn, UserPlus, KeyRound, ArrowRight, Mail, Phone, MessageCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { apiRequest } from "@/lib/queryClient";
@@ -31,6 +32,7 @@ export default function AuthPage() {
   const { login, register, user } = useAuth();
   const [, setLocation] = useLocation();
   const [showReset, setShowReset] = useState(false);
+  const { data: settings } = useQuery<any>({ queryKey: ["/api/settings"] });
 
   useEffect(() => {
     if (user) {
@@ -74,6 +76,11 @@ export default function AuthPage() {
         </div>
 
         <div className="glass rounded-3xl p-6 md:p-8 shadow-2xl border-white/10">
+          {settings?.logoUrl && (
+            <img src={settings.logoUrl} alt="Logo" className="h-20 mx-auto mb-4 object-contain" />
+          )}
+          <h1 className="text-2xl font-bold text-center text-white mb-2">{settings?.storeName || "ويب ستور"}</h1>
+
           <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-6 bg-black/20 p-1 h-12 rounded-xl">
               <TabsTrigger value="login" className="rounded-lg data-[state=active]:bg-primary" data-testid="tab-login">تسجيل الدخول</TabsTrigger>

@@ -1,27 +1,55 @@
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { ShoppingBag, Landmark, Settings, LogOut, User as UserIcon, Bell, Check, CheckCheck, Trash2 } from "lucide-react";
+import { ShoppingBag, Landmark, Settings, LogOut, User as UserIcon, Bell, Check, CheckCheck, Trash2, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { MyOrdersModal } from "./my-orders-modal";
 import { BanksModal } from "./banks-modal";
+import { useSettings } from "@/hooks/use-store";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 
+function playNotificationSound() {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.setValueAtTime(800, ctx.currentTime);
+    osc.frequency.setValueAtTime(1000, ctx.currentTime + 0.1);
+    osc.frequency.setValueAtTime(800, ctx.currentTime + 0.2);
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.4);
+  } catch (e) {}
+}
+
 export function Navbar() {
   const { user, logout } = useAuth();
+  const { data: settings } = useSettings();
   const [showOrders, setShowOrders] = useState(false);
   const [showBanks, setShowBanks] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const qc = useQueryClient();
+  const prevCountRef = useRef(0);
 
   const { data: unreadCount } = useQuery<{ count: number }>({
     queryKey: ["/api/notifications/unread-count"],
     enabled: !!user,
-    refetchInterval: 15000,
+    refetchInterval: 10000,
   });
+
+  useEffect(() => {
+    const current = unreadCount?.count || 0;
+    if (current > prevCountRef.current && prevCountRef.current >= 0) {
+      playNotificationSound();
+    }
+    prevCountRef.current = current;
+  }, [unreadCount?.count]);
 
   const { data: notifs } = useQuery<any[]>({
     queryKey: ["/api/notifications"],
@@ -67,11 +95,15 @@ export function Navbar() {
         <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
           <Link href="/">
             <div className="flex items-center gap-3 cursor-pointer group">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-orange-600 flex items-center justify-center shadow-lg group-hover:shadow-primary/50 transition-all duration-300">
-                <ShoppingBag className="text-white w-6 h-6" />
-              </div>
+              {settings?.logoUrl ? (
+                <img src={settings.logoUrl} alt="Logo" className="w-12 h-12 rounded-xl object-cover shadow-lg" />
+              ) : (
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-orange-600 flex items-center justify-center shadow-lg group-hover:shadow-primary/50 transition-all duration-300">
+                  <ShoppingBag className="text-white w-6 h-6" />
+                </div>
+              )}
               <h1 className="text-2xl font-bold bg-gradient-to-l from-primary to-teal-400 bg-clip-text text-transparent">
-                ويب ستور
+                {settings?.storeName || "ويب ستور"}
               </h1>
             </div>
           </Link>
@@ -179,6 +211,12 @@ export function Navbar() {
                 </Link>
               )}
 
+              <div className="bg-gradient-to-r from-teal-500/20 to-emerald-500/20 border border-teal-500/20 rounded-xl px-3 h-10 flex items-center gap-2 text-sm" data-testid="text-user-balance">
+                <Wallet className="w-4 h-4 text-teal-400" />
+                <span className="font-bold text-teal-400">{(user.balance || 0).toLocaleString()}</span>
+                <span className="text-teal-500 text-xs">ر.ي</span>
+              </div>
+
               <Link href="/profile">
                 <Button 
                   variant="ghost" 
@@ -209,6 +247,12 @@ export function Navbar() {
           )}
         </div>
       </header>
+
+      {settings?.maintenanceEnabled && (
+        <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-xl p-3 mb-4 text-center text-yellow-400 text-sm font-bold">
+          ⚠️ النظام تحت الصيانة - {settings.maintenanceMessage || "يرجى المحاولة لاحقاً"}
+        </div>
+      )}
 
       <MyOrdersModal open={showOrders} onOpenChange={setShowOrders} />
       <BanksModal open={showBanks} onOpenChange={setShowBanks} />

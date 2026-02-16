@@ -3,12 +3,20 @@
 **ويب ستور (Web Store)** is an Arabic-language digital services marketplace where users can purchase game credits, app top-ups, and digital subscriptions. The platform targets a Yemeni market (prices in Yemeni Riyal) and offers services like PUBG Mobile UC, Lama Ludo gems, and Shahid VIP subscriptions.
 
 The app features:
-- User registration/login via full name, phone number, and password
+- User registration/login via full name, phone number/email, and password
+- Password reset via email/WhatsApp
 - A storefront with categories, service groups, and individual service packages
 - An order system where users select a service, enter their game/app ID, and submit orders
-- An admin panel for managing categories, services, orders, ads, banks, users, and settings
+- Balance top-up request system with receipt image upload, admin approval with fund selection and accounting entries
+- Auto-deduct balance on order creation, auto-refund on rejection
+- VIP discount groups (VIP1-VIP7) with global and per-service percentage discounts
+- Multi-currency support (YER/USD) with configurable exchange rate
+- Maintenance mode with automatic user notifications and system lockdown
+- Site logo management from admin settings
+- Notification system with sound alerts (Web Audio API)
+- An admin panel for managing categories, services, orders, deposits, VIP groups, ads, banks, users, and settings
 - A full accounting system with chart of accounts, funds, journal entries, trial balance, and period management
-- Automatic journal entry creation when orders are completed
+- Automatic journal entry creation when orders are completed and deposits approved
 - A glassmorphism dark-themed UI with full RTL (right-to-left) support
 
 ## User Preferences
@@ -51,7 +59,10 @@ Preferred communication style: Simple, everyday language.
 - **orders**: id, userId, serviceId, status (pending/processing/completed/rejected), userInputId, rejectionReason, timestamps
 - **banks**: bank account info for payment
 - **ads**: advertisements with text/image types and optional links
-- **settings**: key-value store for app configuration (WhatsApp number, store name, etc.)
+- **settings**: key-value store for app configuration (WhatsApp number, store name, logo, exchange rate, maintenance mode)
+- **depositRequests**: balance top-up requests with receipt images, approval workflow, fund selection
+- **vipGroups**: VIP discount groups with global percentage discounts
+- **vipServiceDiscounts**: per-service discount overrides for VIP groups
 
 ### Project Structure
 ```
