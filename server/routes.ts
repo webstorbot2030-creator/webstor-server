@@ -4,6 +4,26 @@ import { setupAuth, hashPassword } from "./auth";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import express from "express";
+
+const storage_multer = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const dir = "./uploads";
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir);
+    }
+    cb(null, dir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  },
+});
+
+const upload = multer({ storage: storage_multer });
 
 export async function registerRoutes(
   httpServer: Server,
@@ -11,6 +31,16 @@ export async function registerRoutes(
 ): Promise<Server> {
   // Set up authentication
   setupAuth(app);
+
+  // Serve uploads folder
+  app.use("/uploads", express.static("uploads"));
+
+  app.post("/api/upload", upload.single("file"), (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    if (!req.file) return res.status(400).send("No file uploaded");
+    const url = `/uploads/${req.file.filename}`;
+    res.json({ url });
+  });
 
   // === Categories ===
   app.get(api.categories.list.path, async (req, res) => {

@@ -251,10 +251,34 @@ function ServiceGroupsManager() {
   const { mutate: deleteService } = useDeleteService();
 
   const [selectedGroup, setSelectedGroup] = useState<number | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const groupForm = useForm({
     defaultValues: { name: "", categoryId: "", note: "", image: "", inputType: "id" }
   });
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const { url } = await res.json();
+      groupForm.setValue("image", url);
+    } catch (error) {
+      console.error("Upload error:", error);
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const serviceForm = useForm({
     defaultValues: { name: "", price: "", serviceGroupId: "" }
@@ -301,8 +325,29 @@ function ServiceGroupsManager() {
                 <Input {...groupForm.register("note")} className="bg-black/20 border-white/10 h-11" />
               </div>
               <div className="space-y-2">
-                <label className="text-sm text-slate-400">إيموجي أو رابط صورة</label>
-                <Input {...groupForm.register("image")} placeholder="💎" className="bg-black/20 border-white/10 h-11" />
+                <label className="text-sm text-slate-400">صورة الخدمة</label>
+                <div className="flex gap-2">
+                  <Input {...groupForm.register("image")} placeholder="رابط الصورة أو إيموجي" className="bg-black/20 border-white/10 h-11" />
+                  <div className="relative">
+                    <input
+                      type="file"
+                      id="image-upload"
+                      className="hidden"
+                      accept="image/*"
+                      onChange={handleFileUpload}
+                      disabled={isUploading}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11 px-3 border-white/10 bg-black/20 hover:bg-white/5"
+                      onClick={() => document.getElementById("image-upload")?.click()}
+                      disabled={isUploading}
+                    >
+                      {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                </div>
               </div>
               <div className="space-y-2">
                 <label className="text-sm text-slate-400">تنسيق الطلب</label>
