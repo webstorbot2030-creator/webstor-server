@@ -7,6 +7,7 @@ import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
 import HomePage from "@/pages/home-page";
 import AdminPage from "@/pages/admin-page";
+import AccountingPage from "@/pages/accounting-page";
 
 function Router() {
   return (
@@ -14,6 +15,7 @@ function Router() {
       <Route path="/" component={HomePage} />
       <Route path="/auth" component={AuthPage} />
       <Route path="/admin" component={AdminPage} />
+      <Route path="/accounting" component={AccountingPage} />
       <Route component={NotFound} />
     </Switch>
   );

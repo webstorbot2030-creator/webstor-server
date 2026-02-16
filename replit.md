@@ -7,6 +7,8 @@ The app features:
 - A storefront with categories, service groups, and individual service packages
 - An order system where users select a service, enter their game/app ID, and submit orders
 - An admin panel for managing categories, services, orders, ads, banks, users, and settings
+- A full accounting system with chart of accounts, funds, journal entries, trial balance, and period management
+- Automatic journal entry creation when orders are completed
 - A glassmorphism dark-themed UI with full RTL (right-to-left) support
 
 ## User Preferences
@@ -58,7 +60,7 @@ client/           → React frontend
     components/   → Reusable components (navbar, modals, ads slider)
     components/ui/→ shadcn/ui primitives
     hooks/        → Custom hooks (use-auth, use-store, use-orders)
-    pages/        → Page components (home, auth, admin, not-found)
+    pages/        → Page components (home, auth, admin, accounting, not-found)
     lib/          → Utilities (queryClient, utils)
 server/           → Express backend
   index.ts        → Server entry point

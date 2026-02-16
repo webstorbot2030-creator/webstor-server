@@ -4,6 +4,7 @@ import { setupAuth, hashPassword } from "./auth";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
+import { insertAccountSchema, insertFundSchema, insertAccountingPeriodSchema } from "@shared/schema";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -125,6 +126,59 @@ export async function registerRoutes(
     if (req.user?.role !== "admin") return res.sendStatus(403);
     const { status, rejectionReason } = req.body;
     const order = await storage.updateOrderStatus(Number(req.params.id), status, rejectionReason);
+
+    if (status === "completed") {
+      try {
+        const service = await storage.getService(order.serviceId);
+        if (service) {
+          const allAccounts = await storage.getAccounts();
+          const revenueAccount = allAccounts.find(a => a.code === "4100");
+          const cashAccount = allAccounts.find(a => a.code === "1101");
+
+          if (revenueAccount && cashAccount) {
+            const now = new Date();
+            let period = await storage.getOpenPeriod(now.getFullYear(), now.getMonth() + 1);
+            if (!period) {
+              period = await storage.createAccountingPeriod({
+                year: now.getFullYear(),
+                month: now.getMonth() + 1,
+                periodType: "monthly",
+                status: "open",
+              });
+            }
+
+            if (period.status === "open") {
+              const entryNumber = await storage.getNextEntryNumber();
+              const amount = String(service.price);
+              await storage.createJournalEntry(
+                {
+                  entryNumber,
+                  entryDate: new Date(),
+                  description: `إيراد طلب #${order.id} - ${service.name}`,
+                  sourceType: "order",
+                  sourceId: order.id,
+                  periodId: period.id,
+                  totalDebit: amount,
+                  totalCredit: amount,
+                  createdBy: req.user!.id,
+                },
+                [
+                  { entryId: 0, accountId: cashAccount.id, debit: amount, credit: "0" },
+                  { entryId: 0, accountId: revenueAccount.id, debit: "0", credit: amount },
+                ]
+              );
+            } else {
+              console.warn(`Period ${period.id} is closed, skipping auto journal entry for order ${order.id}`);
+            }
+          } else {
+            console.warn("Missing revenue or cash account for auto journal entry");
+          }
+        }
+      } catch (e) {
+        console.error("Failed to create auto journal entry:", e);
+      }
+    }
+
     res.json(order);
   });
 
@@ -220,9 +274,247 @@ export async function registerRoutes(
     res.json(settings);
   });
 
+  // === Accounting: Accounts (Chart of Accounts) ===
+  app.get("/api/accounting/accounts", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const accounts = await storage.getAccounts();
+    res.json(accounts);
+  });
+
+  app.post("/api/accounting/accounts", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    try {
+      const parsed = insertAccountSchema.parse(req.body);
+      const account = await storage.createAccount(parsed);
+      res.status(201).json(account);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.patch("/api/accounting/accounts/:id", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const account = await storage.updateAccount(Number(req.params.id), req.body);
+    res.json(account);
+  });
+
+  app.delete("/api/accounting/accounts/:id", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    await storage.deleteAccount(Number(req.params.id));
+    res.sendStatus(204);
+  });
+
+  // === Accounting: Funds ===
+  app.get("/api/accounting/funds", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const funds = await storage.getFunds();
+    res.json(funds);
+  });
+
+  app.post("/api/accounting/funds", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    try {
+      const parsed = insertFundSchema.parse(req.body);
+      const fund = await storage.createFund(parsed);
+      res.status(201).json(fund);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.patch("/api/accounting/funds/:id", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const fund = await storage.updateFund(Number(req.params.id), req.body);
+    res.json(fund);
+  });
+
+  app.delete("/api/accounting/funds/:id", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    await storage.deleteFund(Number(req.params.id));
+    res.sendStatus(204);
+  });
+
+  // === Accounting: Fund Transactions ===
+  app.get("/api/accounting/fund-transactions", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const fundId = req.query.fundId ? Number(req.query.fundId) : undefined;
+    const transactions = await storage.getFundTransactions(fundId);
+    res.json(transactions);
+  });
+
+  // === Accounting: Periods ===
+  app.get("/api/accounting/periods", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const periods = await storage.getAccountingPeriods();
+    res.json(periods);
+  });
+
+  app.post("/api/accounting/periods", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    try {
+      const parsed = insertAccountingPeriodSchema.parse(req.body);
+      const period = await storage.createAccountingPeriod(parsed);
+      res.status(201).json(period);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.post("/api/accounting/periods/:id/close", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    try {
+      const period = await storage.closeAccountingPeriod(Number(req.params.id), req.user.id);
+      res.json(period);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  // === Accounting: Journal Entries ===
+  app.get("/api/accounting/journal-entries", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const periodId = req.query.periodId ? Number(req.query.periodId) : undefined;
+    const entries = await storage.getJournalEntries(periodId);
+    res.json(entries);
+  });
+
+  app.get("/api/accounting/journal-entries/:id", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const entry = await storage.getJournalEntry(Number(req.params.id));
+    if (!entry) return res.sendStatus(404);
+    res.json(entry);
+  });
+
+  app.post("/api/accounting/journal-entries", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    try {
+      const { lines, ...entryData } = req.body;
+      if (!lines || !Array.isArray(lines) || lines.length < 2) {
+        return res.status(400).json({ message: "يجب أن يحتوي القيد على سطرين على الأقل" });
+      }
+
+      if (entryData.periodId) {
+        const period = await storage.getAccountingPeriod(entryData.periodId);
+        if (period && period.status === "closed") {
+          return res.status(400).json({ message: "لا يمكن إضافة قيود لفترة مقفلة" });
+        }
+      }
+
+      for (const line of lines) {
+        if (!line.accountId) {
+          return res.status(400).json({ message: "يجب تحديد حساب لكل سطر" });
+        }
+        const account = await storage.getAccount(Number(line.accountId));
+        if (!account) {
+          return res.status(400).json({ message: `الحساب رقم ${line.accountId} غير موجود` });
+        }
+      }
+
+      const totalDebit = lines.reduce((sum: number, l: any) => sum + Number(l.debit || 0), 0);
+      const totalCredit = lines.reduce((sum: number, l: any) => sum + Number(l.credit || 0), 0);
+      if (Math.abs(totalDebit - totalCredit) > 0.01) {
+        return res.status(400).json({ message: "مجموع المدين يجب أن يساوي مجموع الدائن" });
+      }
+      const entryNumber = await storage.getNextEntryNumber();
+      const entry = await storage.createJournalEntry(
+        { ...entryData, entryNumber, totalDebit: String(totalDebit), totalCredit: String(totalCredit), createdBy: req.user.id },
+        lines
+      );
+
+      // Update fund balances if lines have fund references
+      for (const line of lines) {
+        if (line.fundId) {
+          const debitAmt = Number(line.debit || 0);
+          const creditAmt = Number(line.credit || 0);
+          const netAmount = debitAmt - creditAmt;
+          if (netAmount !== 0) {
+            await storage.updateFundBalance(line.fundId, String(netAmount));
+            await storage.createFundTransaction({
+              fundId: line.fundId,
+              transactionType: netAmount > 0 ? "deposit" : "withdraw",
+              amount: String(Math.abs(netAmount)),
+              description: entryData.description,
+              relatedEntryId: entry.id,
+            });
+          }
+        }
+      }
+
+      res.status(201).json(entry);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  // === Accounting: Reports ===
+  app.get("/api/accounting/reports/balances", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const periodId = req.query.periodId ? Number(req.query.periodId) : undefined;
+    const balances = await storage.getAccountBalances(periodId);
+    res.json(balances);
+  });
+
+  app.get("/api/accounting/reports/trial-balance", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const periodId = req.query.periodId ? Number(req.query.periodId) : undefined;
+    const trialBalance = await storage.getTrialBalance(periodId);
+    res.json(trialBalance);
+  });
+
+  // === Seed default accounts ===
+  await seedAccountingDefaults();
+
   await seedDatabase();
 
   return httpServer;
+}
+
+async function seedAccountingDefaults() {
+  const existingAccounts = await storage.getAccounts();
+  if (existingAccounts.length === 0) {
+    console.log("Seeding default chart of accounts...");
+    const defaultAccounts = [
+      { code: "1000", nameAr: "الأصول", type: "asset" },
+      { code: "1100", nameAr: "النقدية والبنوك", type: "asset" },
+      { code: "1101", nameAr: "الصندوق الرئيسي", type: "asset" },
+      { code: "1102", nameAr: "البنك", type: "asset" },
+      { code: "1200", nameAr: "المدينون", type: "asset" },
+      { code: "1201", nameAr: "ذمم العملاء", type: "asset" },
+      { code: "2000", nameAr: "الالتزامات", type: "liability" },
+      { code: "2100", nameAr: "الدائنون", type: "liability" },
+      { code: "2101", nameAr: "ذمم الموردين", type: "liability" },
+      { code: "3000", nameAr: "حقوق الملكية", type: "equity" },
+      { code: "3100", nameAr: "رأس المال", type: "equity" },
+      { code: "3200", nameAr: "الأرباح المحتجزة", type: "equity" },
+      { code: "4000", nameAr: "الإيرادات", type: "revenue" },
+      { code: "4100", nameAr: "إيرادات المبيعات", type: "revenue" },
+      { code: "4101", nameAr: "إيرادات شحن الألعاب", type: "revenue" },
+      { code: "4102", nameAr: "إيرادات الاشتراكات", type: "revenue" },
+      { code: "4103", nameAr: "إيرادات البطاقات", type: "revenue" },
+      { code: "5000", nameAr: "المصروفات", type: "expense" },
+      { code: "5100", nameAr: "تكلفة المبيعات", type: "expense" },
+      { code: "5101", nameAr: "تكلفة شحن الألعاب", type: "expense" },
+      { code: "5102", nameAr: "تكلفة الاشتراكات", type: "expense" },
+      { code: "5103", nameAr: "تكلفة البطاقات", type: "expense" },
+      { code: "5200", nameAr: "المصاريف التشغيلية", type: "expense" },
+      { code: "5201", nameAr: "رواتب وأجور", type: "expense" },
+      { code: "5202", nameAr: "إيجارات", type: "expense" },
+      { code: "5203", nameAr: "مصاريف متنوعة", type: "expense" },
+    ];
+    for (const acc of defaultAccounts) {
+      await storage.createAccount(acc);
+    }
+
+    const now = new Date();
+    await storage.createAccountingPeriod({
+      year: now.getFullYear(),
+      month: now.getMonth() + 1,
+      periodType: "monthly",
+      status: "open",
+    });
+
+    console.log("Accounting defaults seeded.");
+  }
 }
 
 async function seedDatabase() {

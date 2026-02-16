@@ -1,6 +1,7 @@
 import { db } from "./db";
 import {
   users, categories, serviceGroups, services, orders, banks, ads, settings,
+  accounts, funds, accountingPeriods, journalEntries, journalLines, fundTransactions,
   type User, type InsertUser,
   type Category, type InsertCategory,
   type ServiceGroup, type InsertServiceGroup,
@@ -9,8 +10,14 @@ import {
   type Bank, type InsertBank,
   type Ad, type InsertAd,
   type Setting, type InsertSetting,
+  type Account, type InsertAccount,
+  type Fund, type InsertFund,
+  type AccountingPeriod, type InsertAccountingPeriod,
+  type JournalEntry, type InsertJournalEntry,
+  type JournalLine, type InsertJournalLine,
+  type FundTransaction, type InsertFundTransaction,
 } from "@shared/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -72,6 +79,42 @@ export interface IStorage {
   // Settings
   getSettings(): Promise<Setting | undefined>;
   updateSettings(settings: InsertSetting): Promise<Setting>;
+
+  // Accounts (Chart of Accounts)
+  getAccounts(): Promise<Account[]>;
+  getAccount(id: number): Promise<Account | undefined>;
+  createAccount(account: InsertAccount): Promise<Account>;
+  updateAccount(id: number, data: Partial<Account>): Promise<Account>;
+  deleteAccount(id: number): Promise<void>;
+
+  // Funds
+  getFunds(): Promise<Fund[]>;
+  getFund(id: number): Promise<Fund | undefined>;
+  createFund(fund: InsertFund): Promise<Fund>;
+  updateFund(id: number, data: Partial<Fund>): Promise<Fund>;
+  updateFundBalance(id: number, amount: string): Promise<Fund>;
+  deleteFund(id: number): Promise<void>;
+
+  // Accounting Periods
+  getAccountingPeriods(): Promise<AccountingPeriod[]>;
+  getAccountingPeriod(id: number): Promise<AccountingPeriod | undefined>;
+  getOpenPeriod(year: number, month?: number): Promise<AccountingPeriod | undefined>;
+  createAccountingPeriod(period: InsertAccountingPeriod): Promise<AccountingPeriod>;
+  closeAccountingPeriod(id: number, closedBy: number): Promise<AccountingPeriod>;
+
+  // Journal Entries
+  getJournalEntries(periodId?: number): Promise<(JournalEntry & { lines?: JournalLine[] })[]>;
+  getJournalEntry(id: number): Promise<(JournalEntry & { lines: JournalLine[] }) | undefined>;
+  createJournalEntry(entry: InsertJournalEntry, lines: InsertJournalLine[]): Promise<JournalEntry>;
+  getNextEntryNumber(): Promise<string>;
+
+  // Fund Transactions
+  getFundTransactions(fundId?: number): Promise<FundTransaction[]>;
+  createFundTransaction(transaction: InsertFundTransaction): Promise<FundTransaction>;
+
+  // Reports
+  getAccountBalances(periodId?: number): Promise<{ accountId: number; code: string; nameAr: string; type: string; totalDebit: string; totalCredit: string; balance: string }[]>;
+  getTrialBalance(periodId?: number): Promise<{ accountId: number; code: string; nameAr: string; type: string; debit: string; credit: string }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -260,7 +303,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateSettings(insertSetting: InsertSetting): Promise<Setting> {
-    // Check if settings exist, if not create, else update
     const existing = await this.getSettings();
     if (existing) {
       const [updated] = await db.update(settings).set(insertSetting).where(eq(settings.id, existing.id)).returning();
@@ -269,6 +311,197 @@ export class DatabaseStorage implements IStorage {
       const [created] = await db.insert(settings).values(insertSetting).returning();
       return created;
     }
+  }
+
+  // === Accounts (Chart of Accounts) ===
+  async getAccounts(): Promise<Account[]> {
+    return await db.select().from(accounts).orderBy(accounts.code);
+  }
+
+  async getAccount(id: number): Promise<Account | undefined> {
+    const [account] = await db.select().from(accounts).where(eq(accounts.id, id));
+    return account;
+  }
+
+  async createAccount(insertAccount: InsertAccount): Promise<Account> {
+    const [account] = await db.insert(accounts).values(insertAccount).returning();
+    return account;
+  }
+
+  async updateAccount(id: number, data: Partial<Account>): Promise<Account> {
+    const [updated] = await db.update(accounts).set(data).where(eq(accounts.id, id)).returning();
+    return updated;
+  }
+
+  async deleteAccount(id: number): Promise<void> {
+    await db.delete(accounts).where(eq(accounts.id, id));
+  }
+
+  // === Funds ===
+  async getFunds(): Promise<Fund[]> {
+    return await db.select().from(funds);
+  }
+
+  async getFund(id: number): Promise<Fund | undefined> {
+    const [fund] = await db.select().from(funds).where(eq(funds.id, id));
+    return fund;
+  }
+
+  async createFund(insertFund: InsertFund): Promise<Fund> {
+    const [fund] = await db.insert(funds).values(insertFund).returning();
+    return fund;
+  }
+
+  async updateFund(id: number, data: Partial<Fund>): Promise<Fund> {
+    const [updated] = await db.update(funds).set(data).where(eq(funds.id, id)).returning();
+    return updated;
+  }
+
+  async updateFundBalance(id: number, amount: string): Promise<Fund> {
+    const [updated] = await db
+      .update(funds)
+      .set({ balance: sql`${funds.balance} + ${amount}::numeric` })
+      .where(eq(funds.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteFund(id: number): Promise<void> {
+    await db.delete(funds).where(eq(funds.id, id));
+  }
+
+  // === Accounting Periods ===
+  async getAccountingPeriods(): Promise<AccountingPeriod[]> {
+    return await db.select().from(accountingPeriods).orderBy(desc(accountingPeriods.year), desc(accountingPeriods.month));
+  }
+
+  async getAccountingPeriod(id: number): Promise<AccountingPeriod | undefined> {
+    const [period] = await db.select().from(accountingPeriods).where(eq(accountingPeriods.id, id));
+    return period;
+  }
+
+  async getOpenPeriod(year: number, month?: number): Promise<AccountingPeriod | undefined> {
+    const conditions = [eq(accountingPeriods.year, year), eq(accountingPeriods.status, "open")];
+    if (month !== undefined) {
+      conditions.push(eq(accountingPeriods.month, month));
+    }
+    const [period] = await db.select().from(accountingPeriods).where(and(...conditions));
+    return period;
+  }
+
+  async createAccountingPeriod(period: InsertAccountingPeriod): Promise<AccountingPeriod> {
+    const [created] = await db.insert(accountingPeriods).values(period).returning();
+    return created;
+  }
+
+  async closeAccountingPeriod(id: number, closedBy: number): Promise<AccountingPeriod> {
+    const [updated] = await db
+      .update(accountingPeriods)
+      .set({ status: "closed", closedAt: new Date(), closedBy })
+      .where(eq(accountingPeriods.id, id))
+      .returning();
+    return updated;
+  }
+
+  // === Journal Entries ===
+  async getJournalEntries(periodId?: number): Promise<(JournalEntry & { lines?: JournalLine[] })[]> {
+    if (periodId) {
+      return await db.query.journalEntries.findMany({
+        where: eq(journalEntries.periodId, periodId),
+        with: { lines: true },
+        orderBy: [desc(journalEntries.entryDate)],
+      });
+    }
+    return await db.query.journalEntries.findMany({
+      with: { lines: true },
+      orderBy: [desc(journalEntries.entryDate)],
+    });
+  }
+
+  async getJournalEntry(id: number): Promise<(JournalEntry & { lines: JournalLine[] }) | undefined> {
+    const entry = await db.query.journalEntries.findFirst({
+      where: eq(journalEntries.id, id),
+      with: { lines: true },
+    });
+    return entry as (JournalEntry & { lines: JournalLine[] }) | undefined;
+  }
+
+  async createJournalEntry(entry: InsertJournalEntry, lines: InsertJournalLine[]): Promise<JournalEntry> {
+    const [created] = await db.insert(journalEntries).values(entry).returning();
+    for (const line of lines) {
+      await db.insert(journalLines).values({ ...line, entryId: created.id });
+    }
+    return created;
+  }
+
+  async getNextEntryNumber(): Promise<string> {
+    const result = await db.select({ count: sql<number>`count(*)` }).from(journalEntries);
+    const count = Number(result[0].count) + 1;
+    return `JE-${String(count).padStart(6, '0')}`;
+  }
+
+  // === Fund Transactions ===
+  async getFundTransactions(fundId?: number): Promise<FundTransaction[]> {
+    if (fundId) {
+      return await db.select().from(fundTransactions).where(eq(fundTransactions.fundId, fundId)).orderBy(desc(fundTransactions.createdAt));
+    }
+    return await db.select().from(fundTransactions).orderBy(desc(fundTransactions.createdAt));
+  }
+
+  async createFundTransaction(transaction: InsertFundTransaction): Promise<FundTransaction> {
+    const [created] = await db.insert(fundTransactions).values(transaction).returning();
+    return created;
+  }
+
+  // === Reports ===
+  async getAccountBalances(periodId?: number): Promise<{ accountId: number; code: string; nameAr: string; type: string; totalDebit: string; totalCredit: string; balance: string }[]> {
+    const periodCondition = periodId ? sql`AND je.period_id = ${periodId}` : sql``;
+    const result = await db.execute(sql`
+      SELECT 
+        a.id as account_id,
+        a.code,
+        a.name_ar,
+        a.type,
+        COALESCE(SUM(jl.debit), 0)::text as total_debit,
+        COALESCE(SUM(jl.credit), 0)::text as total_credit,
+        (COALESCE(SUM(jl.debit), 0) - COALESCE(SUM(jl.credit), 0))::text as balance
+      FROM accounts a
+      LEFT JOIN journal_lines jl ON a.id = jl.account_id
+      LEFT JOIN journal_entries je ON jl.entry_id = je.id ${periodCondition}
+      WHERE a.is_active = true
+      GROUP BY a.id, a.code, a.name_ar, a.type
+      ORDER BY a.code
+    `);
+    return result.rows as any;
+  }
+
+  async getTrialBalance(periodId?: number): Promise<{ accountId: number; code: string; nameAr: string; type: string; debit: string; credit: string }[]> {
+    const periodCondition = periodId ? sql`AND je.period_id = ${periodId}` : sql``;
+    const result = await db.execute(sql`
+      SELECT 
+        a.id as account_id,
+        a.code,
+        a.name_ar,
+        a.type,
+        CASE 
+          WHEN (COALESCE(SUM(jl.debit), 0) - COALESCE(SUM(jl.credit), 0)) > 0 
+          THEN (COALESCE(SUM(jl.debit), 0) - COALESCE(SUM(jl.credit), 0))::text
+          ELSE '0'
+        END as debit,
+        CASE 
+          WHEN (COALESCE(SUM(jl.credit), 0) - COALESCE(SUM(jl.debit), 0)) > 0 
+          THEN (COALESCE(SUM(jl.credit), 0) - COALESCE(SUM(jl.debit), 0))::text
+          ELSE '0'
+        END as credit
+      FROM accounts a
+      LEFT JOIN journal_lines jl ON a.id = jl.account_id
+      LEFT JOIN journal_entries je ON jl.entry_id = je.id ${periodCondition}
+      WHERE a.is_active = true
+      GROUP BY a.id, a.code, a.name_ar, a.type
+      HAVING COALESCE(SUM(jl.debit), 0) != 0 OR COALESCE(SUM(jl.credit), 0) != 0
+      ORDER BY a.code
+    `);
+    return result.rows as any;
   }
 }
 
