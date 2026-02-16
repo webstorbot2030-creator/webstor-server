@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAllOrders, useUpdateOrderStatus } from "@/hooks/use-orders";
 import { useCategories, useCreateCategory, useDeleteCategory, useServices, useCreateService, useDeleteService, useAds, useCreateAd, useDeleteAd, useBanks, useCreateBank, useDeleteBank, useSettings, useUpdateSettings, useServiceGroups, useCreateServiceGroup, useDeleteServiceGroup } from "@/hooks/use-store";
-import { Loader2, Trash2, Plus, Check, X, LayoutDashboard, ShoppingBag, Package, ListTree, Megaphone, Landmark, Settings, ExternalLink } from "lucide-react";
+import { Loader2, Trash2, Plus, Check, X, LayoutDashboard, ShoppingBag, Package, ListTree, Megaphone, Landmark, Settings, ExternalLink, ShieldAlert } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
