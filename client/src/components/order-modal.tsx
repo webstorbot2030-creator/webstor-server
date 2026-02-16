@@ -75,7 +75,7 @@ export function OrderModal({ serviceGroup, open, onOpenChange }: OrderModalProps
           form.reset();
           
           if (settings?.adminWhatsapp) {
-            const message = `طلب جديد من ويب ستور\n------------------\nالخدمة: ${selectedService.name}\nالمعرف: ${data.userInputId}\nالسعر: ${selectedService.price} ر.ي\nاسم العميل: ${user.fullName}\nرقم الهاتف: ${user.phoneNumber}`;
+            const message = `طلب جديد من ويب ستور\n------------------\nالخدمة: ${selectedService.name}\nالمعرف: ${data.userInputId}\nالسعر: ${selectedService.price} ر.ي\nاسم العميل: ${user.fullName}\n${user.phoneNumber ? 'رقم الهاتف: ' + user.phoneNumber : 'البريد: ' + ((user as any).email || '')}`;
             const whatsappUrl = `https://wa.me/${settings.adminWhatsapp.replace(/\+/g, '')}?text=${encodeURIComponent(message)}`;
             window.open(whatsappUrl, '_blank');
           }
@@ -118,7 +118,7 @@ export function OrderModal({ serviceGroup, open, onOpenChange }: OrderModalProps
             {settings?.adminWhatsapp && selectedService && (
               <Button 
                 onClick={() => {
-                  const message = `تأكيد طلب من ويب ستور\n------------------\nالخدمة: ${selectedService.name}\nالمعرف: ${form.getValues().userInputId || 'تم الإرسال مسبقاً'}\nالسعر: ${selectedService.price} ر.ي\nاسم العميل: ${user?.fullName}\nرقم الهاتف: ${user?.phoneNumber}`;
+                  const message = `تأكيد طلب من ويب ستور\n------------------\nالخدمة: ${selectedService.name}\nالمعرف: ${form.getValues().userInputId || 'تم الإرسال مسبقاً'}\nالسعر: ${selectedService.price} ر.ي\nاسم العميل: ${user?.fullName}\n${user?.phoneNumber ? 'رقم الهاتف: ' + user.phoneNumber : 'البريد: ' + ((user as any)?.email || '')}`;
                   const whatsappUrl = `https://wa.me/${settings.adminWhatsapp.replace(/\+/g, '')}?text=${encodeURIComponent(message)}`;
                   window.open(whatsappUrl, '_blank');
                 }} 
