@@ -672,6 +672,16 @@ export async function registerRoutes(
     res.json({ ...user, password: undefined });
   });
 
+  app.get("/api/vip-group/my", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const user = await storage.getUser(req.user!.id);
+    if (!user || !user.vipGroupId) {
+      return res.json(null);
+    }
+    const vipGroup = await storage.getVipGroup(user.vipGroupId);
+    res.json(vipGroup || null);
+  });
+
   app.get("/api/user/prices", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     const user = await storage.getUser(req.user!.id);

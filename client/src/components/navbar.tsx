@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { ShoppingBag, Landmark, Settings, LogOut, User as UserIcon, Bell, Check, CheckCheck, Trash2, Wallet, Sun, Moon } from "lucide-react";
+import { ShoppingBag, Landmark, Settings, LogOut, User as UserIcon, Bell, Check, CheckCheck, Trash2, Wallet, Sun, Moon, RefreshCw, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { MyOrdersModal } from "./my-orders-modal";
@@ -58,6 +58,11 @@ export function Navbar() {
     enabled: !!user && showNotifications,
   });
 
+  const { data: vipGroup } = useQuery<any>({
+    queryKey: ["/api/vip-group/my"],
+    enabled: !!user,
+  });
+
   const markReadMutation = useMutation({
     mutationFn: async (id: number) => { await apiRequest("POST", `/api/notifications/${id}/read`); },
     onSuccess: () => {
@@ -90,6 +95,7 @@ export function Navbar() {
   };
 
   const count = unreadCount?.count || 0;
+  const isNegativeBalance = (user?.balance || 0) < 0;
 
   return (
     <>
@@ -201,7 +207,7 @@ export function Navbar() {
                 onClick={() => setShowBanks(true)}
               >
                 <Landmark className="w-4 h-4 text-teal-500 dark:text-teal-400" />
-                <span className="hidden sm:inline dark:text-gray-300 text-gray-700">البنوك</span>
+                <span className="hidden sm:inline dark:text-gray-300 text-gray-700">تغذية حسابك</span>
               </Button>
 
               {user.role === 'admin' && (
@@ -216,10 +222,20 @@ export function Navbar() {
                 </Link>
               )}
 
-              <div className="bg-gradient-to-r from-teal-500/20 to-emerald-500/20 border border-teal-500/20 rounded-xl px-3 h-10 flex items-center gap-2 text-sm" data-testid="text-user-balance">
-                <Wallet className="w-4 h-4 text-teal-500 dark:text-teal-400" />
-                <span className="font-bold text-teal-600 dark:text-teal-400">{(user.balance || 0).toLocaleString()}</span>
-                <span className="text-teal-600 dark:text-teal-500 text-xs">ر.ي</span>
+              <div className="flex items-center gap-1">
+                {vipGroup?.name && (
+                  <span className="bg-yellow-500/20 text-yellow-500 dark:text-yellow-400 text-[10px] px-2 py-1 rounded-full font-bold border border-yellow-500/20" data-testid="badge-vip-group">
+                    <Crown className="w-3 h-3 inline ml-1" />{vipGroup.name}
+                  </span>
+                )}
+                <div className={`${isNegativeBalance ? 'bg-gradient-to-r from-red-500/20 to-rose-500/20 border-red-500/20' : 'bg-gradient-to-r from-teal-500/20 to-emerald-500/20 border-teal-500/20'} border rounded-xl px-3 h-10 flex items-center gap-2 text-sm`} data-testid="text-user-balance">
+                  <Wallet className={`w-4 h-4 ${isNegativeBalance ? 'text-red-500 dark:text-red-400' : 'text-teal-500 dark:text-teal-400'}`} />
+                  <span className={`font-bold ${isNegativeBalance ? 'text-red-600 dark:text-red-400' : 'text-teal-600 dark:text-teal-400'}`}>{(user.balance || 0).toLocaleString()}</span>
+                  <span className={`text-xs ${isNegativeBalance ? 'text-red-600 dark:text-red-500' : 'text-teal-600 dark:text-teal-500'}`}>ر.ي</span>
+                  <button onClick={() => qc.invalidateQueries({ queryKey: ["/api/user"] })} className={`${isNegativeBalance ? 'text-red-400 hover:text-red-300' : 'text-teal-400 hover:text-teal-300'} transition-colors`} data-testid="button-refresh-balance">
+                    <RefreshCw className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
 
               <Link href="/profile">
