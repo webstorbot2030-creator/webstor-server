@@ -136,11 +136,12 @@ export async function registerRoutes(
 async function seedDatabase() {
   const existingCategories = await storage.getCategories();
   if (existingCategories.length === 0) {
+    console.log("Seeding database...");
     // 1. Categories
-    const catApps = await storage.createCategory({ name: "قسم التطبيقات", icon: "layout-grid" });
-    const catGames = await storage.createCategory({ name: "قسم الألعاب", icon: "gamepad-2" });
-    const catSubs = await storage.createCategory({ name: "قسم الاشتراكات", icon: "tv" });
-    const catCards = await storage.createCategory({ name: "قسم البطائق", icon: "credit-card" });
+    const catApps = await storage.createCategory({ name: "قسم التطبيقات", icon: "Smartphone" });
+    const catGames = await storage.createCategory({ name: "قسم الألعاب", icon: "Gamepad2" });
+    const catSubs = await storage.createCategory({ name: "قسم الاشتراكات", icon: "Package" });
+    const catCards = await storage.createCategory({ name: "قسم البطائق", icon: "CreditCard" });
 
     // 2. Lama Ludo
     const lamaGroup = await storage.createServiceGroup({
@@ -242,6 +243,7 @@ async function seedDatabase() {
       logoUrl: "/logo.png",
       adminWhatsapp: "967700000000"
     });
+    console.log("Seeding completed.");
   }
 
   const adminUser = await storage.getUserByPhoneNumber("0000000000");
