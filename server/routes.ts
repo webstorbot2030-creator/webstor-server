@@ -321,16 +321,53 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  app.post("/api/admin/users/:id/reset-password", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const userId = Number(req.params.id);
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ message: "كلمة المرور يجب أن تكون 6 أحرف على الأقل" });
+    }
+    const user = await storage.getUser(userId);
+    if (!user) return res.status(404).json({ message: "المستخدم غير موجود" });
+    const hashedPassword = await hashPassword(newPassword);
+    await storage.updateUserPassword(userId, hashedPassword);
+    try {
+      await storage.createNotification({
+        userId,
+        type: "info",
+        title: "تم تغيير كلمة المرور",
+        message: "قام المدير بإعادة تعيين كلمة المرور الخاصة بك. تواصل مع الإدارة للحصول على كلمة المرور الجديدة.",
+      });
+      await storage.createAdminActivityLog({
+        userId: req.user.id,
+        action: "إعادة تعيين كلمة مرور",
+        details: `إعادة تعيين كلمة مرور المستخدم ${user.fullName}`,
+        targetType: "user",
+        targetId: userId,
+      });
+    } catch (e) { console.error(e); }
+    res.json({ success: true, message: "تم إعادة تعيين كلمة المرور بنجاح" });
+  });
+
   app.patch("/api/admin/users/:id", async (req, res) => {
     if (req.user?.role !== "admin") return res.sendStatus(403);
-    const { role, balance, active, fullName } = req.body;
+    const { role, balance, active, fullName, email } = req.body;
     const updateData: any = {};
     if (role !== undefined) updateData.role = role;
     if (balance !== undefined) updateData.balance = balance;
     if (active !== undefined) updateData.active = active;
     if (fullName !== undefined) updateData.fullName = fullName;
-    const user = await storage.updateUser(Number(req.params.id), updateData);
-    res.json({ ...user, password: undefined });
+    if (email !== undefined) updateData.email = email;
+    try {
+      const user = await storage.updateUser(Number(req.params.id), updateData);
+      res.json({ ...user, password: undefined });
+    } catch (e: any) {
+      if (e.code === "23505" && e.constraint?.includes("email")) {
+        return res.status(400).json({ message: "هذا البريد الإلكتروني مستخدم بالفعل" });
+      }
+      throw e;
+    }
   });
 
   // === Service Group & Service Toggle ===

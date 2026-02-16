@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useAllOrders, useUpdateOrderStatus } from "@/hooks/use-orders";
 import { useCategories, useCreateCategory, useDeleteCategory, useServices, useCreateService, useDeleteService, useAds, useCreateAd, useDeleteAd, useBanks, useCreateBank, useDeleteBank, useSettings, useUpdateSettings, useServiceGroups, useCreateServiceGroup, useDeleteServiceGroup, useAdminUsers, useUpdateUser, useUpdateServiceGroup, useUpdateService } from "@/hooks/use-store";
-import { Loader2, Trash2, Plus, Check, X, LayoutDashboard, ShoppingBag, Package, ListTree, Megaphone, Landmark, Settings, ExternalLink, ShieldAlert, Users, Power, Image, Link, Eye, EyeOff, UserCog, Wallet, BarChart3, Download, Filter, TrendingUp, Clock, UserPlus, DollarSign, Activity } from "lucide-react";
+import { Loader2, Trash2, Plus, Check, X, LayoutDashboard, ShoppingBag, Package, ListTree, Megaphone, Landmark, Settings, ExternalLink, ShieldAlert, Users, Power, Image, Link, Eye, EyeOff, UserCog, Wallet, BarChart3, Download, Filter, TrendingUp, Clock, UserPlus, DollarSign, Activity, KeyRound, Lock, Mail, MessageCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
@@ -104,6 +105,10 @@ export default function AdminPage() {
                     <Activity className="w-4 h-4" />
                     <span>السجل</span>
                   </TabsTrigger>
+                  <TabsTrigger value="myaccount" className="data-[state=active]:bg-primary data-[state=active]:text-white px-4 py-2 rounded-xl transition-all flex gap-2 items-center text-xs">
+                    <Lock className="w-4 h-4" />
+                    <span>حسابي</span>
+                  </TabsTrigger>
                 </TabsList>
               </div>
 
@@ -133,6 +138,9 @@ export default function AdminPage() {
               </TabsContent>
               <TabsContent value="activity" className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
                 <AdminActivityLogsManager />
+              </TabsContent>
+              <TabsContent value="myaccount" className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+                <AdminAccountManager />
               </TabsContent>
             </Tabs>
           </div>
@@ -238,6 +246,8 @@ function UsersManager() {
   const { mutate: updateUser } = useUpdateUser();
   const [searchQuery, setSearchQuery] = useState("");
   const [editingUser, setEditingUser] = useState<any>(null);
+  const [resetPasswordUser, setResetPasswordUser] = useState<any>(null);
+  const [newPassword, setNewPassword] = useState("");
   const [balanceAmount, setBalanceAmount] = useState("");
   const { toast } = useToast();
 
@@ -269,6 +279,27 @@ function UsersManager() {
   };
 
   const queryClient = useQueryClient();
+
+  const handleResetPassword = async (id: number) => {
+    if (!newPassword || newPassword.length < 6) {
+      toast({ title: "كلمة المرور يجب أن تكون 6 أحرف على الأقل", variant: "destructive" });
+      return;
+    }
+    try {
+      const res = await fetch(`/api/admin/users/${id}/reset-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newPassword }),
+      });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message); }
+      toast({ title: "تم إعادة تعيين كلمة المرور بنجاح" });
+      setNewPassword("");
+      setResetPasswordUser(null);
+    } catch (e: any) {
+      toast({ title: e.message || "خطأ", variant: "destructive" });
+    }
+  };
+
   const handleAddBalance = async (id: number) => {
     const amount = parseInt(balanceAmount);
     if (isNaN(amount) || amount <= 0) {
@@ -368,6 +399,31 @@ function UsersManager() {
                           </Button>
                           <Button className="flex-1 bg-teal-600 hover:bg-teal-700 h-12 rounded-xl" onClick={() => handleBalanceUpdate(u.id)} data-testid="button-set-balance">تعيين الرصيد</Button>
                         </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+
+                  <Dialog open={resetPasswordUser === u.id} onOpenChange={open => { if (!open) { setResetPasswordUser(null); setNewPassword(""); } }}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" variant="outline" className="h-8 px-3 rounded-lg text-xs border-orange-500/20 text-orange-400 hover:bg-orange-500/10" onClick={() => setResetPasswordUser(u.id)} data-testid={`button-reset-password-${u.id}`}>
+                        <KeyRound className="w-3.5 h-3.5 ml-1" /> كلمة المرور
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="bg-slate-900 border-white/10 text-white">
+                      <DialogHeader><DialogTitle>إعادة تعيين كلمة مرور {u.fullName}</DialogTitle></DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <p className="text-sm text-slate-400">أدخل كلمة المرور الجديدة للمستخدم (6 أحرف على الأقل)</p>
+                        <Input
+                          value={newPassword}
+                          onChange={e => setNewPassword(e.target.value)}
+                          type="password"
+                          placeholder="كلمة المرور الجديدة"
+                          className="bg-black/20 border-white/10 h-12 text-center text-lg"
+                          data-testid="input-new-password"
+                        />
+                        <Button className="w-full bg-orange-600 hover:bg-orange-700 h-12 rounded-xl gap-2" onClick={() => handleResetPassword(u.id)} data-testid="button-confirm-reset-password">
+                          <KeyRound className="w-4 h-4" /> تعيين كلمة المرور
+                        </Button>
                       </div>
                     </DialogContent>
                   </Dialog>
@@ -1112,5 +1168,200 @@ function AdminActivityLogsManager() {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function AdminAccountManager() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPasswordVal, setNewPasswordVal] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [recoveryEmail, setRecoveryEmail] = useState(user?.email || "");
+  const [savingEmail, setSavingEmail] = useState(false);
+
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPasswordVal || !confirmPassword) {
+      toast({ title: "جميع الحقول مطلوبة", variant: "destructive" });
+      return;
+    }
+    if (newPasswordVal !== confirmPassword) {
+      toast({ title: "كلمة المرور الجديدة غير متطابقة", variant: "destructive" });
+      return;
+    }
+    if (newPasswordVal.length < 6) {
+      toast({ title: "كلمة المرور يجب أن تكون 6 أحرف على الأقل", variant: "destructive" });
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      const res = await fetch("/api/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword: newPasswordVal, confirmPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      toast({ title: "تم تغيير كلمة المرور بنجاح" });
+      setCurrentPassword("");
+      setNewPasswordVal("");
+      setConfirmPassword("");
+    } catch (e: any) {
+      toast({ title: e.message || "خطأ", variant: "destructive" });
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  const handleUpdateRecoveryEmail = async () => {
+    if (!recoveryEmail || !recoveryEmail.includes("@")) {
+      toast({ title: "أدخل بريد إلكتروني صحيح", variant: "destructive" });
+      return;
+    }
+    setSavingEmail(true);
+    try {
+      const res = await fetch(`/api/admin/users/${user?.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: recoveryEmail }),
+      });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message); }
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      toast({ title: "تم حفظ البريد الإلكتروني للاسترداد" });
+    } catch (e: any) {
+      toast({ title: e.message || "خطأ", variant: "destructive" });
+    } finally {
+      setSavingEmail(false);
+    }
+  };
+
+  const { data: settingsData } = useSettings();
+  const adminWhatsapp = settingsData?.adminWhatsapp || "";
+
+  return (
+    <div className="space-y-6">
+      <Card className="bg-slate-900 border-white/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Lock className="w-5 h-5 text-orange-400" />
+            تغيير كلمة المرور
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="max-w-md space-y-4">
+            <div>
+              <label className="text-sm text-slate-400 mb-1 block">كلمة المرور الحالية</label>
+              <Input
+                type="password"
+                value={currentPassword}
+                onChange={e => setCurrentPassword(e.target.value)}
+                placeholder="أدخل كلمة المرور الحالية"
+                className="bg-black/20 border-white/10 h-12"
+                data-testid="input-current-password"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-slate-400 mb-1 block">كلمة المرور الجديدة</label>
+              <Input
+                type="password"
+                value={newPasswordVal}
+                onChange={e => setNewPasswordVal(e.target.value)}
+                placeholder="6 أحرف على الأقل"
+                className="bg-black/20 border-white/10 h-12"
+                data-testid="input-admin-new-password"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-slate-400 mb-1 block">تأكيد كلمة المرور الجديدة</label>
+              <Input
+                type="password"
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                placeholder="أعد إدخال كلمة المرور الجديدة"
+                className="bg-black/20 border-white/10 h-12"
+                data-testid="input-confirm-new-password"
+              />
+            </div>
+            <Button
+              onClick={handleChangePassword}
+              disabled={changingPassword}
+              className="bg-orange-600 hover:bg-orange-700 h-12 rounded-xl gap-2 w-full"
+              data-testid="button-change-admin-password"
+            >
+              {changingPassword ? <Loader2 className="animate-spin w-4 h-4" /> : <Lock className="w-4 h-4" />}
+              تغيير كلمة المرور
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-slate-900 border-white/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Mail className="w-5 h-5 text-blue-400" />
+            بريد استرداد الحساب
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-slate-400">أضف بريدك الإلكتروني لاستعادة حسابك في حال نسيت كلمة المرور</p>
+          <div className="max-w-md flex gap-3">
+            <Input
+              type="email"
+              value={recoveryEmail}
+              onChange={e => setRecoveryEmail(e.target.value)}
+              placeholder="example@email.com"
+              className="bg-black/20 border-white/10 h-12 flex-1"
+              dir="ltr"
+              data-testid="input-recovery-email"
+            />
+            <Button
+              onClick={handleUpdateRecoveryEmail}
+              disabled={savingEmail}
+              className="bg-blue-600 hover:bg-blue-700 h-12 rounded-xl gap-2 px-6"
+              data-testid="button-save-recovery-email"
+            >
+              {savingEmail ? <Loader2 className="animate-spin w-4 h-4" /> : <Check className="w-4 h-4" />}
+              حفظ
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-slate-900 border-white/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MessageCircle className="w-5 h-5 text-green-400" />
+            استرداد عبر واتساب
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-slate-400">
+            يمكنك استعادة حسابك عبر واتساب المرتبط بالنظام. عند طلب استعادة كلمة المرور، سيتم إرسال رمز التحقق إلى واتساب النظام.
+          </p>
+          {adminWhatsapp ? (
+            <div className="flex items-center gap-3 bg-green-500/10 border border-green-500/20 rounded-xl p-4">
+              <MessageCircle className="w-5 h-5 text-green-400" />
+              <div>
+                <p className="text-green-400 font-bold text-sm">واتساب النظام مفعل</p>
+                <p className="text-slate-400 text-xs font-mono" dir="ltr">{adminWhatsapp}</p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4">
+              <MessageCircle className="w-5 h-5 text-yellow-400" />
+              <div>
+                <p className="text-yellow-400 font-bold text-sm">واتساب النظام غير مضاف</p>
+                <p className="text-slate-400 text-xs">أضف رقم واتساب من تبويب الإعدادات لتفعيل الاسترداد عبر واتساب</p>
+              </div>
+            </div>
+          )}
+          <p className="text-xs text-slate-500">
+            ملاحظة: يمكن أيضاً استعادة حسابك من صفحة تسجيل الدخول عبر خيار "نسيت كلمة المرور" باستخدام البريد الإلكتروني أو رقم واتساب.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
