@@ -10,7 +10,9 @@ export const users = pgTable("users", {
   fullName: text("full_name").notNull(),
   phoneNumber: text("phone_number").notNull().unique(),
   password: text("password").notNull(),
-  role: text("role").notNull().default("user"), // 'admin' or 'user'
+  role: text("role").notNull().default("user"),
+  balance: integer("balance").default(0),
+  active: boolean("active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -64,6 +66,9 @@ export const ads = pgTable("ads", {
   text: text("text").notNull(),
   icon: text("icon").notNull(),
   active: boolean("active").default(true),
+  imageUrl: text("image_url"),
+  linkUrl: text("link_url"),
+  adType: text("ad_type").default("text"),
 });
 
 export const settings = pgTable("settings", {

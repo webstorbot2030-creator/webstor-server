@@ -59,6 +59,16 @@ export interface IStorage {
   createAd(ad: InsertAd): Promise<Ad>;
   deleteAd(id: number): Promise<void>;
 
+  // Users Management
+  getAllUsers(): Promise<User[]>;
+  updateUser(id: number, data: Partial<User>): Promise<User>;
+  updateUserBalance(id: number, balance: number): Promise<User>;
+  toggleUserActive(id: number, active: boolean): Promise<User>;
+
+  // Service Group & Service Toggle
+  updateServiceGroup(id: number, data: Partial<ServiceGroup>): Promise<ServiceGroup>;
+  updateService(id: number, data: Partial<Service>): Promise<Service>;
+
   // Settings
   getSettings(): Promise<Setting | undefined>;
   updateSettings(settings: InsertSetting): Promise<Setting>;
@@ -210,6 +220,37 @@ export class DatabaseStorage implements IStorage {
 
   async deleteAd(id: number): Promise<void> {
     await db.delete(ads).where(eq(ads.id, id));
+  }
+
+  // Users Management
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users);
+  }
+
+  async updateUser(id: number, data: Partial<User>): Promise<User> {
+    const [updated] = await db.update(users).set(data).where(eq(users.id, id)).returning();
+    return updated;
+  }
+
+  async updateUserBalance(id: number, balance: number): Promise<User> {
+    const [updated] = await db.update(users).set({ balance }).where(eq(users.id, id)).returning();
+    return updated;
+  }
+
+  async toggleUserActive(id: number, active: boolean): Promise<User> {
+    const [updated] = await db.update(users).set({ active }).where(eq(users.id, id)).returning();
+    return updated;
+  }
+
+  // Service Group & Service Toggle
+  async updateServiceGroup(id: number, data: Partial<ServiceGroup>): Promise<ServiceGroup> {
+    const [updated] = await db.update(serviceGroups).set(data).where(eq(serviceGroups.id, id)).returning();
+    return updated;
+  }
+
+  async updateService(id: number, data: Partial<Service>): Promise<Service> {
+    const [updated] = await db.update(services).set(data).where(eq(services.id, id)).returning();
+    return updated;
   }
 
   // Settings
