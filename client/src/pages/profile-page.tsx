@@ -38,14 +38,14 @@ export default function ProfilePage() {
       return await res.json();
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/deposit-requests"] });
-      qc.invalidateQueries({ queryKey: ["/api/user"] });
+      toast({ title: "تم إرسال طلب الشحن بنجاح" });
       setDepositAmount("");
       setReceiptUrl("");
-      toast({ title: "تم بنجاح", description: "تم إرسال طلب الإيداع" });
+      qc.invalidateQueries({ queryKey: ["/api/deposit-requests"] });
+      qc.invalidateQueries({ queryKey: ["/api/user"] });
     },
-    onError: (e: any) => {
-      toast({ title: "خطأ", description: e.message || "حدث خطأ", variant: "destructive" });
+    onError: (error: any) => {
+      toast({ title: "خطأ", description: error.message || "فشل إرسال الطلب", variant: "destructive" });
     },
   });
 
@@ -100,16 +100,17 @@ export default function ProfilePage() {
     }
     setLoading(true);
     try {
-      const res = await apiRequest("POST", "/api/change-password", { currentPassword, newPassword, confirmPassword });
-      const data = await res.json();
-      if (data.success) {
-        toast({ title: "تم بنجاح", description: "تم تغيير كلمة المرور" });
-        setCurrentPassword("");
-        setNewPassword("");
-        setConfirmPassword("");
+      const res = await apiRequest("POST", "/api/change-password", { currentPassword, newPassword });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message);
       }
+      toast({ title: "تم تغيير كلمة المرور بنجاح" });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
     } catch (e: any) {
-      toast({ title: "خطأ", description: e.message || "حدث خطأ", variant: "destructive" });
+      toast({ title: "خطأ", description: e.message || "فشل تغيير كلمة المرور", variant: "destructive" });
     }
     setLoading(false);
   };
@@ -118,13 +119,13 @@ export default function ProfilePage() {
     <div className="min-h-screen p-4 md:p-8">
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="flex items-center gap-3 mb-6">
-          <Button variant="ghost" className="text-slate-400 hover:text-white" onClick={() => setLocation("/")} data-testid="button-back-home">
+          <Button variant="ghost" className="dark:text-slate-400 text-gray-500 dark:hover:text-white hover:text-gray-900" onClick={() => setLocation("/")} data-testid="button-back-home">
             <ArrowRight className="w-5 h-5" />
           </Button>
           <h1 className="text-2xl font-bold dark:text-white text-gray-900">الملف الشخصي</h1>
         </div>
 
-        <Card className="dark:bg-slate-900/80 bg-white/90 dark:border-white/5 border-gray-200 backdrop-blur-sm">
+        <Card className="dark:bg-slate-900/80 bg-white/90 dark:border-white/5 border-gray-200 backdrop-blur-sm shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 dark:text-white text-gray-900">
               <User className="w-5 h-5 text-primary" />
@@ -144,10 +145,10 @@ export default function ProfilePage() {
 
               {user.phoneNumber && (
                 <div className="space-y-2">
-                  <label className="text-xs text-slate-400 flex items-center gap-1">
+                  <label className="text-xs dark:text-slate-400 text-gray-500 flex items-center gap-1">
                     <Phone className="w-3 h-3" /> رقم الهاتف
                   </label>
-                  <div className="bg-black/30 border border-white/5 rounded-xl p-3 text-white font-mono" dir="ltr" data-testid="text-profile-phone">
+                  <div className="dark:bg-black/30 bg-gray-50 border dark:border-white/5 border-gray-200 rounded-xl p-3 dark:text-white text-gray-900 font-mono" dir="ltr" data-testid="text-profile-phone">
                     {user.phoneNumber}
                   </div>
                 </div>
@@ -155,78 +156,78 @@ export default function ProfilePage() {
 
               {(user as any).email && (
                 <div className="space-y-2">
-                  <label className="text-xs text-slate-400 flex items-center gap-1">
+                  <label className="text-xs dark:text-slate-400 text-gray-500 flex items-center gap-1">
                     <Mail className="w-3 h-3" /> البريد الإلكتروني
                   </label>
-                  <div className="bg-black/30 border border-white/5 rounded-xl p-3 text-white" dir="ltr" data-testid="text-profile-email">
+                  <div className="dark:bg-black/30 bg-gray-50 border dark:border-white/5 border-gray-200 rounded-xl p-3 dark:text-white text-gray-900" dir="ltr" data-testid="text-profile-email">
                     {(user as any).email}
                   </div>
                 </div>
               )}
 
               <div className="space-y-2">
-                <label className="text-xs text-slate-400 flex items-center gap-1">
+                <label className="text-xs dark:text-slate-400 text-gray-500 flex items-center gap-1">
                   <Wallet className="w-3 h-3" /> الرصيد
                 </label>
-                <div className="bg-black/30 border border-white/5 rounded-xl p-3 text-primary font-bold" data-testid="text-profile-balance">
+                <div className="dark:bg-black/30 bg-gray-50 border dark:border-white/5 border-gray-200 rounded-xl p-3 text-primary font-bold" data-testid="text-profile-balance">
                   {(user.balance || 0).toLocaleString()} ر.ي
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs text-slate-400 flex items-center gap-1">
+                <label className="text-xs dark:text-slate-400 text-gray-500 flex items-center gap-1">
                   <Shield className="w-3 h-3" /> نوع الحساب
                 </label>
-                <div className="bg-black/30 border border-white/5 rounded-xl p-3 text-white" data-testid="text-profile-role">
+                <div className="dark:bg-black/30 bg-gray-50 border dark:border-white/5 border-gray-200 rounded-xl p-3 dark:text-white text-gray-900" data-testid="text-profile-role">
                   {user.role === "admin" ? "مدير" : "مستخدم"}
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs text-slate-400 flex items-center gap-1">
+                <label className="text-xs dark:text-slate-400 text-gray-500 flex items-center gap-1">
                   <Calendar className="w-3 h-3" /> تاريخ التسجيل
                 </label>
-                <div className="bg-black/30 border border-white/5 rounded-xl p-3 text-white" data-testid="text-profile-date">
+                <div className="dark:bg-black/30 bg-gray-50 border dark:border-white/5 border-gray-200 rounded-xl p-3 dark:text-white text-gray-900" data-testid="text-profile-date">
                   {user.createdAt ? format(new Date(user.createdAt), "yyyy/MM/dd") : "غير محدد"}
                 </div>
               </div>
             </div>
 
-            <p className="text-[11px] text-slate-500 mt-2">
+            <p className="text-[11px] dark:text-slate-500 text-gray-400 mt-2">
               * لا يمكن تغيير الاسم أو رقم الهاتف أو البريد الإلكتروني لحماية حسابك
             </p>
           </CardContent>
         </Card>
 
-        <Card className="dark:bg-slate-900/80 bg-white/90 dark:border-white/5 border-gray-200 backdrop-blur-sm" dir="rtl">
+        <Card className="dark:bg-slate-900/80 bg-white/90 dark:border-white/5 border-gray-200 backdrop-blur-sm shadow-sm" dir="rtl">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-white">
-              <Wallet className="w-5 h-5 text-green-400" />
+            <CardTitle className="flex items-center gap-2 dark:text-white text-gray-900">
+              <Wallet className="w-5 h-5 text-green-500 dark:text-green-400" />
               طلب شحن رصيد
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="bg-black/30 border border-white/5 rounded-xl p-4 text-center">
-              <p className="text-xs text-slate-400 mb-1">رصيدك الحالي</p>
+            <div className="dark:bg-black/30 bg-gray-50 border dark:border-white/5 border-gray-200 rounded-xl p-4 text-center">
+              <p className="text-xs dark:text-slate-400 text-gray-500 mb-1">رصيدك الحالي</p>
               <p className="text-2xl font-bold text-primary" data-testid="text-deposit-balance">
                 {(user.balance || 0).toLocaleString()} ر.ي
               </p>
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs text-slate-400">المبلغ المطلوب</label>
+              <label className="text-xs dark:text-slate-400 text-gray-500">المبلغ المطلوب</label>
               <Input
                 type="number"
                 placeholder="أدخل المبلغ"
                 value={depositAmount}
                 onChange={e => setDepositAmount(e.target.value)}
-                className="bg-black/20 border-white/10 h-12"
+                className="dark:bg-black/20 bg-gray-50 dark:border-white/10 border-gray-200 h-12"
                 data-testid="input-deposit-amount"
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs text-slate-400">صورة الإيصال</label>
+              <label className="text-xs dark:text-slate-400 text-gray-500">صورة الإيصال</label>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -237,7 +238,7 @@ export default function ProfilePage() {
               />
               <Button
                 variant="outline"
-                className="w-full h-12 border-white/10 text-slate-300"
+                className="w-full h-12 dark:border-white/10 border-gray-200 dark:text-slate-300 text-gray-600"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
                 data-testid="button-upload-receipt"
@@ -246,8 +247,8 @@ export default function ProfilePage() {
                 {receiptUrl ? "تم الرفع - اضغط لتغيير" : "رفع صورة الإيصال"}
               </Button>
               {receiptUrl && (
-                <div className="mt-2 rounded-xl overflow-hidden border border-white/5">
-                  <img src={receiptUrl} alt="إيصال" className="w-full max-h-48 object-contain bg-black/20" data-testid="img-receipt-preview" />
+                <div className="mt-2 rounded-xl overflow-hidden border dark:border-white/5 border-gray-200">
+                  <img src={receiptUrl} alt="إيصال" className="w-full max-h-48 object-contain dark:bg-black/20 bg-gray-50" data-testid="img-receipt-preview" />
                 </div>
               )}
             </div>
@@ -255,7 +256,7 @@ export default function ProfilePage() {
             <Button
               onClick={submitDeposit}
               disabled={depositMutation.isPending}
-              className="w-full h-12 bg-green-600 hover:bg-green-700 rounded-xl font-bold"
+              className="w-full h-12 bg-green-600 hover:bg-green-700 rounded-xl font-bold text-white"
               data-testid="button-submit-deposit"
             >
               {depositMutation.isPending ? <Loader2 className="animate-spin w-5 h-5 ml-2" /> : <Wallet className="w-4 h-4 ml-2" />}
@@ -263,25 +264,25 @@ export default function ProfilePage() {
             </Button>
 
             {depositsLoading ? (
-              <div className="flex justify-center py-4"><Loader2 className="animate-spin w-5 h-5 text-slate-400" /></div>
+              <div className="flex justify-center py-4"><Loader2 className="animate-spin w-5 h-5 dark:text-slate-400 text-gray-400" /></div>
             ) : deposits.length > 0 && (
               <div className="space-y-2 mt-4">
-                <h3 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                <h3 className="text-sm font-semibold dark:text-slate-300 text-gray-700 flex items-center gap-2">
                   <Clock className="w-4 h-4" /> طلبات الشحن السابقة
                 </h3>
                 {deposits.map((d: any) => (
-                  <div key={d.id} className="bg-black/30 border border-white/5 rounded-xl p-3 flex items-center justify-between gap-2 flex-wrap" data-testid={`deposit-request-${d.id}`}>
+                  <div key={d.id} className="dark:bg-black/30 bg-gray-50 border dark:border-white/5 border-gray-200 rounded-xl p-3 flex items-center justify-between gap-2 flex-wrap" data-testid={`deposit-request-${d.id}`}>
                     <div className="space-y-1">
-                      <p className="text-white text-sm font-medium">{Number(d.amount).toLocaleString()} ر.ي</p>
-                      {d.approvedAmount && <p className="text-xs text-green-400">المبلغ المعتمد: {Number(d.approvedAmount).toLocaleString()} ر.ي</p>}
-                      {d.rejectionReason && <p className="text-xs text-red-400">السبب: {d.rejectionReason}</p>}
-                      {d.createdAt && <p className="text-[10px] text-slate-500">{format(new Date(d.createdAt), "yyyy/MM/dd HH:mm")}</p>}
+                      <p className="dark:text-white text-gray-900 text-sm font-medium">{Number(d.amount).toLocaleString()} ر.ي</p>
+                      {d.approvedAmount && <p className="text-xs text-green-500 dark:text-green-400">المبلغ المعتمد: {Number(d.approvedAmount).toLocaleString()} ر.ي</p>}
+                      {d.rejectionReason && <p className="text-xs text-red-500 dark:text-red-400">السبب: {d.rejectionReason}</p>}
+                      {d.createdAt && <p className="text-[10px] dark:text-slate-500 text-gray-400">{format(new Date(d.createdAt), "yyyy/MM/dd HH:mm")}</p>}
                     </div>
                     <Badge
                       className={
-                        d.status === "approved" ? "bg-green-600/20 text-green-400 border-green-600/30" :
-                        d.status === "rejected" ? "bg-red-600/20 text-red-400 border-red-600/30" :
-                        "bg-yellow-600/20 text-yellow-400 border-yellow-600/30"
+                        d.status === "approved" ? "bg-green-600/20 text-green-600 dark:text-green-400 border-green-600/30" :
+                        d.status === "rejected" ? "bg-red-600/20 text-red-600 dark:text-red-400 border-red-600/30" :
+                        "bg-yellow-600/20 text-yellow-600 dark:text-yellow-400 border-yellow-600/30"
                       }
                       data-testid={`badge-status-${d.id}`}
                     >
@@ -294,48 +295,48 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
-        <Card className="dark:bg-slate-900/80 bg-white/90 dark:border-white/5 border-gray-200 backdrop-blur-sm">
+        <Card className="dark:bg-slate-900/80 bg-white/90 dark:border-white/5 border-gray-200 backdrop-blur-sm shadow-sm">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-white">
-              <Lock className="w-5 h-5 text-orange-400" />
+            <CardTitle className="flex items-center gap-2 dark:text-white text-gray-900">
+              <Lock className="w-5 h-5 text-orange-500 dark:text-orange-400" />
               تغيير كلمة المرور
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <label className="text-xs text-slate-400">كلمة المرور الحالية</label>
+              <label className="text-xs dark:text-slate-400 text-gray-500">كلمة المرور الحالية</label>
               <Input
                 type="password"
                 placeholder="أدخل كلمة المرور الحالية"
                 value={currentPassword}
                 onChange={e => setCurrentPassword(e.target.value)}
-                className="bg-black/20 border-white/10 h-12"
+                className="dark:bg-black/20 bg-gray-50 dark:border-white/10 border-gray-200 h-12"
                 data-testid="input-current-password"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-xs text-slate-400">كلمة المرور الجديدة</label>
+              <label className="text-xs dark:text-slate-400 text-gray-500">كلمة المرور الجديدة</label>
               <Input
                 type="password"
                 placeholder="أدخل كلمة المرور الجديدة"
                 value={newPassword}
                 onChange={e => setNewPassword(e.target.value)}
-                className="bg-black/20 border-white/10 h-12"
+                className="dark:bg-black/20 bg-gray-50 dark:border-white/10 border-gray-200 h-12"
                 data-testid="input-profile-new-password"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-xs text-slate-400">تأكيد كلمة المرور الجديدة</label>
+              <label className="text-xs dark:text-slate-400 text-gray-500">تأكيد كلمة المرور الجديدة</label>
               <Input
                 type="password"
                 placeholder="أعد كتابة كلمة المرور الجديدة"
                 value={confirmPassword}
                 onChange={e => setConfirmPassword(e.target.value)}
-                className="bg-black/20 border-white/10 h-12"
+                className="dark:bg-black/20 bg-gray-50 dark:border-white/10 border-gray-200 h-12"
                 data-testid="input-profile-confirm-password"
               />
             </div>
-            <Button onClick={changePassword} disabled={loading} className="w-full h-12 bg-orange-600 hover:bg-orange-700 rounded-xl font-bold" data-testid="button-change-password">
+            <Button onClick={changePassword} disabled={loading} className="w-full h-12 bg-orange-600 hover:bg-orange-700 rounded-xl font-bold text-white" data-testid="button-change-password">
               {loading ? <Loader2 className="animate-spin w-5 h-5 ml-2" /> : <Lock className="w-4 h-4 ml-2" />}
               تغيير كلمة المرور
             </Button>

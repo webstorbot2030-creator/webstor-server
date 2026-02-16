@@ -83,10 +83,10 @@ export function Navbar() {
   });
 
   const typeColors: Record<string, string> = {
-    success: "bg-green-500/20 text-green-400 border-green-500/20",
-    error: "bg-red-500/20 text-red-400 border-red-500/20",
-    info: "bg-blue-500/20 text-blue-400 border-blue-500/20",
-    order: "bg-orange-500/20 text-orange-400 border-orange-500/20",
+    success: "bg-green-500/20 text-green-600 dark:text-green-400 border-green-500/20",
+    error: "bg-red-500/20 text-red-600 dark:text-red-400 border-red-500/20",
+    info: "bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/20",
+    order: "bg-orange-500/20 text-orange-600 dark:text-orange-400 border-orange-500/20",
   };
 
   const count = unreadCount?.count || 0;
@@ -120,11 +120,11 @@ export function Navbar() {
               <div className="relative">
                 <Button 
                   variant="ghost" 
-                  className="bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-sm h-10 w-10 p-0 relative"
+                  className="dark:bg-white/5 bg-gray-100 dark:hover:bg-white/10 hover:bg-gray-200 border dark:border-white/5 border-gray-200 rounded-xl text-sm h-10 w-10 p-0 relative"
                   onClick={() => setShowNotifications(!showNotifications)}
                   data-testid="button-notifications"
                 >
-                  <Bell className="w-4 h-4 text-yellow-400" />
+                  <Bell className="w-4 h-4 text-yellow-500 dark:text-yellow-400" />
                   {count > 0 && (
                     <span className="absolute -top-1 -left-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center" data-testid="badge-notification-count">
                       {count > 9 ? "9+" : count}
@@ -139,7 +139,7 @@ export function Navbar() {
                       <div className="flex items-center justify-between p-4 border-b dark:border-white/5 border-gray-100">
                         <h3 className="font-bold dark:text-white text-gray-900 text-sm">الإشعارات</h3>
                         {count > 0 && (
-                          <Button variant="ghost" size="sm" className="text-xs text-blue-400 hover:text-blue-300 h-7" onClick={() => markAllReadMutation.mutate()} data-testid="button-mark-all-read">
+                          <Button variant="ghost" size="sm" className="text-xs text-blue-500 dark:text-blue-400 hover:text-blue-400 h-7" onClick={() => markAllReadMutation.mutate()} data-testid="button-mark-all-read">
                             <CheckCheck className="w-3 h-3 ml-1" />
                             قراءة الكل
                           </Button>
@@ -147,13 +147,13 @@ export function Navbar() {
                       </div>
                       <div className="overflow-y-auto flex-1">
                         {(!notifs || notifs.length === 0) ? (
-                          <div className="p-8 text-center text-slate-500 text-sm">
+                          <div className="p-8 text-center dark:text-slate-500 text-gray-400 text-sm">
                             <Bell className="w-8 h-8 mx-auto mb-2 opacity-30" />
                             لا توجد إشعارات
                           </div>
                         ) : (
                           notifs.map((n: any) => (
-                            <div key={n.id} className={`p-3 border-b border-white/5 hover:bg-white/5 transition-colors ${!n.isRead ? 'bg-blue-500/5' : ''}`} data-testid={`notification-item-${n.id}`}>
+                            <div key={n.id} className={`p-3 border-b dark:border-white/5 border-gray-100 dark:hover:bg-white/5 hover:bg-gray-50 transition-colors ${!n.isRead ? 'dark:bg-blue-500/5 bg-blue-50' : ''}`} data-testid={`notification-item-${n.id}`}>
                               <div className="flex items-start gap-3">
                                 <div className={`w-2 h-2 rounded-full mt-2 shrink-0 ${!n.isRead ? 'bg-blue-400' : 'bg-transparent'}`} />
                                 <div className="flex-1 min-w-0">
@@ -161,18 +161,18 @@ export function Navbar() {
                                     <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${typeColors[n.type] || typeColors.info}`}>
                                       {n.type === 'success' ? 'نجاح' : n.type === 'error' ? 'خطأ' : n.type === 'order' ? 'طلب' : 'معلومة'}
                                     </Badge>
-                                    <span className="text-[10px] text-slate-500">{n.createdAt ? format(new Date(n.createdAt), "MM/dd HH:mm") : ""}</span>
+                                    <span className="text-[10px] dark:text-slate-500 text-gray-400">{n.createdAt ? format(new Date(n.createdAt), "MM/dd HH:mm") : ""}</span>
                                   </div>
-                                  <p className="text-xs font-semibold text-white">{n.title}</p>
-                                  <p className="text-xs text-slate-400 mt-0.5 truncate">{n.message}</p>
+                                  <p className="text-xs font-semibold dark:text-white text-gray-900">{n.title}</p>
+                                  <p className="text-xs dark:text-slate-400 text-gray-500 mt-0.5 truncate">{n.message}</p>
                                 </div>
                                 <div className="flex gap-1 shrink-0">
                                   {!n.isRead && (
-                                    <Button variant="ghost" size="icon" className="w-6 h-6 text-blue-400 hover:text-blue-300" onClick={() => markReadMutation.mutate(n.id)} data-testid={`button-read-${n.id}`}>
+                                    <Button variant="ghost" size="icon" className="w-6 h-6 text-blue-500 dark:text-blue-400 hover:text-blue-400" onClick={() => markReadMutation.mutate(n.id)} data-testid={`button-read-${n.id}`}>
                                       <Check className="w-3 h-3" />
                                     </Button>
                                   )}
-                                  <Button variant="ghost" size="icon" className="w-6 h-6 text-red-400 hover:text-red-300" onClick={() => deleteNotifMutation.mutate(n.id)} data-testid={`button-delete-notif-${n.id}`}>
+                                  <Button variant="ghost" size="icon" className="w-6 h-6 text-red-500 dark:text-red-400 hover:text-red-400" onClick={() => deleteNotifMutation.mutate(n.id)} data-testid={`button-delete-notif-${n.id}`}>
                                     <Trash2 className="w-3 h-3" />
                                   </Button>
                                 </div>
@@ -188,54 +188,54 @@ export function Navbar() {
 
               <Button 
                 variant="ghost" 
-                className="bg-white/5 hover:bg-white/10 hover:text-primary border border-white/5 rounded-xl gap-2 text-sm h-10 px-4"
+                className="dark:bg-white/5 bg-gray-100 dark:hover:bg-white/10 hover:bg-gray-200 hover:text-primary border dark:border-white/5 border-gray-200 rounded-xl gap-2 text-sm h-10 px-4"
                 onClick={() => setShowOrders(true)}
               >
                 <ShoppingBag className="w-4 h-4 text-primary" />
-                <span className="hidden sm:inline">طلباتي</span>
+                <span className="hidden sm:inline dark:text-gray-300 text-gray-700">طلباتي</span>
               </Button>
               
               <Button 
                 variant="ghost" 
-                className="bg-white/5 hover:bg-white/10 hover:text-teal-400 border border-white/5 rounded-xl gap-2 text-sm h-10 px-4"
+                className="dark:bg-white/5 bg-gray-100 dark:hover:bg-white/10 hover:bg-gray-200 hover:text-teal-500 border dark:border-white/5 border-gray-200 rounded-xl gap-2 text-sm h-10 px-4"
                 onClick={() => setShowBanks(true)}
               >
-                <Landmark className="w-4 h-4 text-teal-400" />
-                <span className="hidden sm:inline">البنوك</span>
+                <Landmark className="w-4 h-4 text-teal-500 dark:text-teal-400" />
+                <span className="hidden sm:inline dark:text-gray-300 text-gray-700">البنوك</span>
               </Button>
 
               {user.role === 'admin' && (
                 <Link href="/admin">
                   <Button 
                     variant="ghost" 
-                    className="bg-white/5 hover:bg-white/10 hover:text-purple-400 border border-white/5 rounded-xl gap-2 text-sm h-10 px-4"
+                    className="dark:bg-white/5 bg-gray-100 dark:hover:bg-white/10 hover:bg-gray-200 hover:text-purple-500 border dark:border-white/5 border-gray-200 rounded-xl gap-2 text-sm h-10 px-4"
                   >
-                    <Settings className="w-4 h-4 text-purple-400" />
-                    <span>الإدارة</span>
+                    <Settings className="w-4 h-4 text-purple-500 dark:text-purple-400" />
+                    <span className="dark:text-gray-300 text-gray-700">الإدارة</span>
                   </Button>
                 </Link>
               )}
 
               <div className="bg-gradient-to-r from-teal-500/20 to-emerald-500/20 border border-teal-500/20 rounded-xl px-3 h-10 flex items-center gap-2 text-sm" data-testid="text-user-balance">
-                <Wallet className="w-4 h-4 text-teal-400" />
-                <span className="font-bold text-teal-400">{(user.balance || 0).toLocaleString()}</span>
-                <span className="text-teal-500 text-xs">ر.ي</span>
+                <Wallet className="w-4 h-4 text-teal-500 dark:text-teal-400" />
+                <span className="font-bold text-teal-600 dark:text-teal-400">{(user.balance || 0).toLocaleString()}</span>
+                <span className="text-teal-600 dark:text-teal-500 text-xs">ر.ي</span>
               </div>
 
               <Link href="/profile">
                 <Button 
                   variant="ghost" 
-                  className="bg-white/5 hover:bg-white/10 hover:text-cyan-400 border border-white/5 rounded-xl gap-2 text-sm h-10 px-4"
+                  className="dark:bg-white/5 bg-gray-100 dark:hover:bg-white/10 hover:bg-gray-200 hover:text-cyan-500 border dark:border-white/5 border-gray-200 rounded-xl gap-2 text-sm h-10 px-4"
                   data-testid="button-profile"
                 >
-                  <UserIcon className="w-4 h-4 text-cyan-400" />
-                  <span className="hidden sm:inline">حسابي</span>
+                  <UserIcon className="w-4 h-4 text-cyan-500 dark:text-cyan-400" />
+                  <span className="hidden sm:inline dark:text-gray-300 text-gray-700">حسابي</span>
                 </Button>
               </Link>
 
               <Button 
                 variant="ghost" 
-                className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-xl gap-2 text-sm h-10 px-4"
+                className="bg-red-500/10 hover:bg-red-500/20 text-red-500 dark:text-red-400 border border-red-500/20 rounded-xl gap-2 text-sm h-10 px-4"
                 onClick={() => logout.mutate()}
               >
                 <LogOut className="w-4 h-4" />
@@ -254,7 +254,7 @@ export function Navbar() {
       </header>
 
       {settings?.maintenanceEnabled && (
-        <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-xl p-3 mb-4 text-center text-yellow-400 text-sm font-bold">
+        <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-xl p-3 mb-4 text-center text-yellow-600 dark:text-yellow-400 text-sm font-bold">
           ⚠️ النظام تحت الصيانة - {settings.maintenanceMessage || "يرجى المحاولة لاحقاً"}
         </div>
       )}

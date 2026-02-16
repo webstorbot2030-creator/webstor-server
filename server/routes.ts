@@ -1207,6 +1207,115 @@ export async function registerRoutes(
     res.json(trialBalance);
   });
 
+  // === Backup System ===
+  const backupsDir = "./backups";
+  if (!fs.existsSync(backupsDir)) {
+    fs.mkdirSync(backupsDir, { recursive: true });
+  }
+
+  app.get("/api/admin/backups", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    try {
+      const files = fs.existsSync(backupsDir) ? fs.readdirSync(backupsDir).filter(f => f.endsWith('.json')) : [];
+      const backups = files.map(f => {
+        const stat = fs.statSync(path.join(backupsDir, f));
+        return { filename: f, size: stat.size, createdAt: stat.mtime.toISOString() };
+      }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      res.json(backups);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post("/api/admin/backups/create", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    try {
+      const users = await storage.getUsers();
+      const categories = await storage.getCategories();
+      const serviceGroups = await storage.getServiceGroups();
+      const services = await storage.getServices();
+      const orders = await storage.getOrders();
+      const banks = await storage.getBanks();
+      const ads = await storage.getAds();
+      const settings = await storage.getSettings();
+      const deposits = await storage.getDepositRequests();
+      const vipGroups = await storage.getVipGroups();
+
+      const backup = {
+        version: 1,
+        createdAt: new Date().toISOString(),
+        data: { users, categories, serviceGroups, services, orders, banks, ads, settings, deposits, vipGroups }
+      };
+
+      const filename = `backup_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+      fs.writeFileSync(path.join(backupsDir, filename), JSON.stringify(backup, null, 2), 'utf-8');
+
+      const files = fs.readdirSync(backupsDir).filter(f => f.endsWith('.json')).sort();
+      if (files.length > 10) {
+        for (const old of files.slice(0, files.length - 10)) {
+          fs.unlinkSync(path.join(backupsDir, old));
+        }
+      }
+
+      res.json({ filename, message: "تم إنشاء النسخة الاحتياطية بنجاح" });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.get("/api/admin/backups/download/:filename", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const filename = path.basename(req.params.filename);
+    if (!filename.endsWith('.json')) return res.status(400).json({ message: "ملف غير صالح" });
+    const filePath = path.join(backupsDir, filename);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ message: "الملف غير موجود" });
+    res.download(filePath);
+  });
+
+  app.delete("/api/admin/backups/:filename", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const filename = path.basename(req.params.filename);
+    if (!filename.endsWith('.json')) return res.status(400).json({ message: "ملف غير صالح" });
+    const filePath = path.join(backupsDir, filename);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ message: "الملف غير موجود" });
+    fs.unlinkSync(filePath);
+    res.json({ message: "تم حذف النسخة الاحتياطية" });
+  });
+
+  // === System Reset ===
+  app.post("/api/admin/system/reset-balances", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    try {
+      const { pool } = await import("./db");
+      await pool.query("UPDATE users SET balance = 0");
+      res.json({ message: "تم تصفير أرصدة جميع المستخدمين" });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post("/api/admin/system/reset-orders", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    try {
+      const { pool } = await import("./db");
+      await pool.query("DELETE FROM orders");
+      res.json({ message: "تم حذف جميع الطلبات" });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post("/api/admin/system/reset-deposits", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    try {
+      const { pool } = await import("./db");
+      await pool.query("DELETE FROM deposit_requests");
+      res.json({ message: "تم حذف جميع طلبات الإيداع" });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   // === Seed default accounts ===
   await seedAccountingDefaults();
 
