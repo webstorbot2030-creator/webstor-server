@@ -1,7 +1,7 @@
 import { Navbar } from "@/components/navbar";
 import { AdsSlider } from "@/components/ads-slider";
 import { useCategories, useServices } from "@/hooks/use-store";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Search, Gamepad2, CreditCard, Smartphone, Package } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -18,13 +18,31 @@ export default function HomePage() {
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [orderModalOpen, setOrderModalOpen] = useState(false);
 
-  // Filter services
-  const filteredServices = (services as (Service & { serviceGroup?: ServiceGroup })[] | undefined)?.filter(s => {
-    const categoryId = s.serviceGroup?.categoryId;
-    const matchesCategory = activeCategory === 'all' || categoryId === activeCategory;
-    const matchesSearch = s.name.toLowerCase().includes(search.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  // Filter services and group them by service group
+  const groupedServices = useMemo(() => {
+    if (!services) return [];
+    
+    const filtered = (services as (Service & { group?: ServiceGroup })[]).filter(s => {
+      const categoryId = s.group?.categoryId;
+      const matchesCategory = activeCategory === 'all' || categoryId === activeCategory;
+      const matchesSearch = s.name.toLowerCase().includes(search.toLowerCase()) || 
+                           s.group?.name.toLowerCase().includes(search.toLowerCase());
+      return matchesCategory && matchesSearch;
+    });
+
+    const groups: Record<number, { group: ServiceGroup, services: Service[] }> = {};
+    
+    filtered.forEach(s => {
+      if (s.group) {
+        if (!groups[s.group.id]) {
+          groups[s.group.id] = { group: s.group, services: [] };
+        }
+        groups[s.group.id].services.push(s);
+      }
+    });
+
+    return Object.values(groups);
+  }, [services, activeCategory, search]);
 
   const handleServiceClick = (service: Service) => {
     setSelectedService(service);
@@ -79,59 +97,79 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Services Grid */}
+        {/* Groups & Services */}
         {servLoading || catLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {[1,2,3,4,5,6,7,8,9,10].map(i => (
-              <div key={i} className="h-40 bg-white/5 rounded-2xl animate-pulse" />
+          <div className="space-y-8">
+            {[1, 2].map(i => (
+              <div key={i} className="space-y-4">
+                <div className="h-8 w-48 bg-white/5 rounded-lg animate-pulse" />
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  {[1, 2, 3, 4, 5].map(j => (
+                    <div key={j} className="h-48 bg-white/5 rounded-2xl animate-pulse" />
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         ) : (
-          <motion.div 
-            layout
-            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"
-          >
-            <AnimatePresence>
-              {filteredServices?.map((service: any) => (
-                <GlassCard 
-                  key={service.id}
-                  onClick={() => handleServiceClick(service)}
-                  className="flex flex-col items-center text-center gap-3 p-5 h-full justify-between group"
-                >
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 flex items-center justify-center text-3xl mb-1 shadow-inner group-hover:scale-110 transition-transform duration-300">
-                     {/* If image is URL use img, else use emoji/icon fallback */}
-                     {service.image?.startsWith('http') ? (
-                       <img src={service.image!} alt={service.name} className="w-full h-full object-cover rounded-2xl" />
-                     ) : (
-                       <span>{service.image || '💎'}</span>
-                     )}
-                  </div>
-                  
-                  <div className="space-y-1 w-full">
-                    <h3 className="font-bold text-white text-sm sm:text-base leading-tight line-clamp-2 min-h-[2.5rem] flex items-center justify-center">
-                      {service.name}
-                    </h3>
-                    <p className="text-teal-400 font-bold text-lg">
-                      {service.price} ر.ي
-                    </p>
-                  </div>
-                  
-                  <button className="w-full bg-white/5 hover:bg-primary hover:text-white text-primary border border-primary/30 rounded-lg py-2 text-sm font-bold transition-all duration-300 mt-2">
-                    طلب الآن
-                  </button>
-                </GlassCard>
-              ))}
-            </AnimatePresence>
-          </motion.div>
-        )}
+          <div className="space-y-12">
+            {groupedServices.map(({ group, services }) => (
+              <section key={group.id} className="space-y-6">
+                <div className="flex items-center gap-3 border-r-4 border-primary pr-4">
+                  <h2 className="text-2xl font-bold text-white">{group.name}</h2>
+                  {group.note && (
+                    <span className="text-sm text-gray-400 font-normal mr-2">({group.note})</span>
+                  )}
+                </div>
 
-        {(filteredServices?.length === 0 || !filteredServices) && !servLoading && (
-          <div className="text-center py-20 text-gray-500">
-            لا توجد خدمات مطابقة للبحث
+                <motion.div 
+                  layout
+                  className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"
+                >
+                  <AnimatePresence>
+                    {services.map((service) => (
+                      <GlassCard 
+                        key={service.id}
+                        onClick={() => handleServiceClick(service)}
+                        className="flex flex-col items-center text-center gap-3 p-5 h-full justify-between group cursor-pointer"
+                      >
+                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 flex items-center justify-center text-3xl mb-1 shadow-inner group-hover:scale-110 transition-transform duration-300">
+                           {group.image?.startsWith('http') ? (
+                             <img src={group.image} alt={group.name} className="w-full h-full object-cover rounded-2xl" />
+                           ) : (
+                             <span>{group.image || '💎'}</span>
+                           )}
+                        </div>
+                        
+                        <div className="space-y-1 w-full">
+                          <h3 className="font-bold text-white text-sm sm:text-base leading-tight line-clamp-2 min-h-[2.5rem] flex items-center justify-center">
+                            {service.name}
+                          </h3>
+                          <p className="text-teal-400 font-bold text-lg">
+                            {service.price.toLocaleString()} ر.ي
+                          </p>
+                        </div>
+                        
+                        <button className="w-full bg-white/5 hover:bg-primary hover:text-white text-primary border border-primary/30 rounded-lg py-2 text-sm font-bold transition-all duration-300 mt-2">
+                          طلب الآن
+                        </button>
+                      </GlassCard>
+                    ))}
+                  </AnimatePresence>
+                </motion.div>
+              </section>
+            ))}
           </div>
         )}
 
-        <footer className="glass rounded-2xl p-8 mt-12 text-center">
+        {groupedServices.length === 0 && !servLoading && (
+          <div className="text-center py-20 text-gray-500">
+            <Package className="w-16 h-16 mx-auto mb-4 opacity-20" />
+            <p className="text-xl">لا توجد خدمات مطابقة للبحث</p>
+          </div>
+        )}
+
+        <footer className="glass rounded-2xl p-8 mt-20 text-center">
           <div className="flex flex-col items-center gap-4">
             <ShoppingBagIcon className="w-16 h-16 text-primary/50" />
             <h2 className="text-xl font-bold text-primary">ويب ستور</h2>
