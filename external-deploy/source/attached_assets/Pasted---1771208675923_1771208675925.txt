@@ -1,0 +1,664 @@
+اريد تصميم موقع بواجهه تسجيل دخول وانشاء حساب للمستخدمين عبر رقم الاسم الرباعي ورقم الهاتف وكلمه المرور وصفحه رئيسيه ولوحه خاصه بالادار بنفس التصميم لهاذا الكود  وبنفس الاجزاء والاقسام 
+والخدمات والواجهات بكامل البيانات لهاذا الكود خذ من الكود كل شي وابدا بتصميم الموقع متكامل لاخر خطوه 
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ويب ستور | متجر الخدمات الرقمية</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts - Cairo -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        * { font-family: 'Cairo', sans-serif; }
+        body { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; }
+        
+        /* Glassmorphism */
+        .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .glass-card { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.05); transition: all 0.3s ease; }
+        .glass-card:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(249, 115, 22, 0.3); transform: translateY(-2px); }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); }
+        ::-webkit-scrollbar-thumb { background: rgba(249, 115, 22, 0.5); border-radius: 10px; }
+        
+        /* Animations */
+        .modal-enter { animation: modalFadeIn 0.3s ease-out; }
+        @keyframes modalFadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        
+        .slider-container { overflow: hidden; position: relative; }
+        .slider-track { display: flex; animation: slide 30s linear infinite; }
+        @keyframes slide { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+        
+        .tab-active { background: linear-gradient(135deg, #f97316, #fb923c); color: white; box-shadow: 0 4px 15px rgba(249, 115, 22, 0.3); border: none; }
+        .order-tab-active { @apply bg-teal-600 text-white border-teal-500; }
+        .order-tab-inactive { @apply bg-slate-800 text-slate-400 border-slate-700 hover:text-white; }
+        .copy-success { animation: copyPulse 0.3s ease-in-out; }
+        @keyframes copyPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); background: rgba(34, 197, 94, 0.2); } }
+    </style>
+</head>
+<body class="text-gray-100">
+
+    <!-- Main Container -->
+    <div class="container mx-auto px-4 py-6 max-w-7xl">
+        <!-- Header -->
+        <header class="glass rounded-2xl p-4 mb-6 flex items-center justify-between flex-wrap gap-4">
+            <div class="flex items-center gap-3">
+                <img id="headerLogo" src="https://cdn-icons-png.flaticon.com/512/3050/3050525.png" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3050/3050525.png'" class="w-12 h-12 rounded-lg object-cover cursor-pointer hover:opacity-80 transition" onclick="document.getElementById('logoUpload').click()">
+                <input type="file" id="logoUpload" accept="image/*" class="hidden" onchange="updateLogo(this)">
+                <h1 class="text-2xl font-bold bg-gradient-to-l from-orange-500 to-teal-500 bg-clip-text text-transparent">ويب ستور</h1>
+            </div>
+            <div class="flex items-center gap-3 flex-wrap">
+                <button onclick="showOrders()" class="glass-card px-4 py-2 rounded-xl hover:border-orange-500 transition flex items-center gap-2">
+                    <i data-lucide="shopping-bag" class="w-5 h-5 text-orange-500"></i><span class="hidden sm:inline">سجل طلباتي</span>
+                </button>
+                <button onclick="showBanks()" class="glass-card px-4 py-2 rounded-xl hover:border-teal-500 transition flex items-center gap-2">
+                    <i data-lucide="landmark" class="w-5 h-5 text-teal-500"></i><span class="hidden sm:inline">الحسابات البنكية</span>
+                </button>
+                <button onclick="showAdminPanel()" class="glass-card px-4 py-2 rounded-xl hover:border-orange-500 transition flex items-center gap-2">
+                    <i data-lucide="settings" class="w-5 h-5 text-orange-500"></i><span>الإدارة</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Slider -->
+        <div class="glass rounded-2xl p-4 mb-6 overflow-hidden">
+            <div class="slider-container">
+                <div class="slider-track gap-4" id="sliderTrack"></div>
+            </div>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="glass rounded-2xl p-4 mb-6">
+            <div class="relative">
+                <i data-lucide="search" class="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5"></i>
+                <input type="text" id="searchInput" onkeyup="filterServices()" placeholder="ابحث عن لعبة أو خدمة..." class="w-full bg-transparent border border-gray-700 rounded-xl py-3 pr-12 pl-4 focus:border-orange-500 focus:outline-none transition">
+            </div>
+        </div>
+
+        <!-- Categories Tabs -->
+        <div class="glass rounded-2xl p-4 mb-6">
+            <div class="flex flex-wrap gap-3" id="categoriesTabs"></div>
+        </div>
+
+        <!-- Services Grid -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6" id="servicesGrid"></div>
+
+        <!-- Footer -->
+        <footer class="glass rounded-2xl p-6 mt-8">
+            <div class="flex flex-col items-center gap-4">
+                <img id="footerLogo" src="https://cdn-icons-png.flaticon.com/512/3050/3050525.png" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3050/3050525.png'" class="w-16 h-16 rounded-lg object-cover">
+                <h2 class="text-xl font-bold text-orange-500">ويب ستور</h2>
+                <p class="text-gray-400 text-center">جميع الحقوق محفوظة &copy; 2026 ويب ستور</p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Modals -->
+    <!-- Order Modal -->
+    <div id="orderModal" class="fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm hidden items-center justify-center z-50" onclick="if(event.target===this) hideModal('orderModal')">
+        <div class="glass rounded-2xl p-6 max-w-md w-full mx-4 modal-enter">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-orange-500" id="modalServiceName">طلب الخدمة</h3>
+                <button onclick="hideModal('orderModal')" class="text-gray-400 hover:text-white"><i data-lucide="x" class="w-6 h-6"></i></button>
+            </div>
+            
+            <!-- Service Note Display -->
+            <div id="serviceNoteDisplay" class="hidden bg-blue-500/10 border border-blue-500/30 p-3 rounded-xl mb-4">
+                <div class="flex items-start gap-2">
+                    <i data-lucide="info" class="w-5 h-5 text-blue-400 shrink-0 mt-0.5"></i>
+                    <p class="text-sm text-blue-100" id="serviceNoteText"></p>
+                </div>
+            </div>
+
+            <div id="serviceCategories" class="mb-4"></div>
+            <div id="servicePrices" class="space-y-2 mb-4 max-h-60 overflow-y-auto custom-scrollbar"></div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium mb-2">الآيدي أو الرقم</label>
+                <input type="text" id="userId" placeholder="أدخل الآيدي الخاص بك" class="w-full bg-transparent border border-gray-700 rounded-xl py-2 px-4 focus:border-orange-500 focus:outline-none transition">
+            </div>
+            <button onclick="sendToWhatsApp()" class="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl transition flex items-center justify-center gap-2">
+                <i data-lucide="send" class="w-5 h-5"></i><span>تأكيد الطلب</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Admin Panel -->
+    <div id="adminModal" class="fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm hidden items-center justify-center z-50" onclick="if(event.target===this) hideModal('adminModal')">
+        <div class="glass rounded-2xl p-6 max-w-5xl w-full mx-4 max-h-[90vh] overflow-y-auto modal-enter">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-orange-500">لوحة التحكم</h3>
+                <button onclick="hideModal('adminModal')" class="text-gray-400 hover:text-white"><i data-lucide="x" class="w-6 h-6"></i></button>
+            </div>
+            <div id="adminPasswordDiv" class="mb-6">
+                <div class="flex gap-2">
+                    <input type="password" id="adminPassword" placeholder="أدخل كلمة المرور" class="flex-1 bg-transparent border border-gray-700 rounded-xl py-2 px-4 focus:border-orange-500 focus:outline-none">
+                    <button onclick="checkAdminPassword()" class="bg-orange-500 hover:bg-orange-600 px-6 py-2 rounded-xl transition">دخول</button>
+                </div>
+            </div>
+            <div id="adminContent" class="hidden">
+                <div class="flex flex-wrap gap-2 mb-6 border-b border-gray-700 pb-4">
+                    <button onclick="showAdminSection('orders')" class="admin-tab-btn px-4 py-2 rounded-lg transition font-bold text-sm" data-section="orders">الطلبات</button>
+                    <button onclick="showAdminSection('ads')" class="admin-tab-btn px-4 py-2 rounded-lg transition font-bold text-sm" data-section="ads">الإعلانات</button>
+                    <button onclick="showAdminSection('categories')" class="admin-tab-btn px-4 py-2 rounded-lg transition font-bold text-sm" data-section="categories">الأقسام</button>
+                    <button onclick="showAdminSection('games')" class="admin-tab-btn px-4 py-2 rounded-lg transition font-bold text-sm" data-section="games">الخدمات والملاحظات</button>
+                    <button onclick="showAdminSection('services')" class="admin-tab-btn px-4 py-2 rounded-lg transition font-bold text-sm" data-section="services">الأسعار والباقات</button>
+                    <button onclick="showAdminSection('banks')" class="admin-tab-btn px-4 py-2 rounded-lg transition font-bold text-sm" data-section="banks">البنوك</button>
+                    <button onclick="showAdminSection('settings')" class="admin-tab-btn px-4 py-2 rounded-lg transition font-bold text-sm" data-section="settings">الإعدادات</button>
+                </div>
+
+                <!-- Admin Sections -->
+                <div id="adminOrders" class="admin-section hidden">
+                    <div class="flex items-center justify-between mb-4">
+                        <h4 class="text-lg font-semibold text-teal-500">إدارة الطلبات</h4>
+                        <span class="text-xs text-gray-400" id="ordersCountBadge">0 طلب</span>
+                    </div>
+
+                    <div class="space-y-4 mb-4">
+                        <div class="relative"><i data-lucide="search" class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4"></i><input type="text" id="adminOrderSearch" onkeyup="searchAdminOrders()" placeholder="بحث..." class="w-full bg-slate-800 border border-slate-700 rounded-xl py-2.5 pr-10 pl-4 text-sm"></div>
+                        <div class="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+                            <button onclick="filterAdminOrders('all')" id="filter-all" class="order-filter-btn px-4 py-1.5 rounded-full border text-xs font-bold whitespace-nowrap order-tab-active">الكل</button>
+                            <button onclick="filterAdminOrders('pending')" id="filter-pending" class="order-filter-btn px-4 py-1.5 rounded-full border text-xs font-bold whitespace-nowrap order-tab-inactive">قيد الانتظار 🟡</button>
+                            <button onclick="filterAdminOrders('processing')" id="filter-processing" class="order-filter-btn px-4 py-1.5 rounded-full border text-xs font-bold whitespace-nowrap order-tab-inactive">قيد التجهيز 🔵</button>
+                            <button onclick="filterAdminOrders('completed')" id="filter-completed" class="order-filter-btn px-4 py-1.5 rounded-full border text-xs font-bold whitespace-nowrap order-tab-inactive">مكتمل 🟢</button>
+                            <button onclick="filterAdminOrders('rejected')" id="filter-rejected" class="order-filter-btn px-4 py-1.5 rounded-full border text-xs font-bold whitespace-nowrap order-tab-inactive">مرفوض 🔴</button>
+                        </div>
+                    </div>
+                    <div id="adminOrdersList" class="space-y-3"></div>
+                </div>
+
+                <!-- Admin Forms with Edit/Cancel support -->
+                <div id="adminAds" class="admin-section hidden">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <input type="text" id="adText" placeholder="نص الإعلان" class="bg-transparent border border-gray-700 rounded-xl py-2 px-4">
+                        <select id="adIcon" class="bg-transparent border border-gray-700 rounded-xl py-2 px-4"><option value="zap">⚡ عرض</option><option value="star">⭐ نجمة</option><option value="crown">👑 تاج</option><option value="gift">🎁 هدية</option><option value="bell">🔔 جرس</option><option value="flame">🔥 نار</option></select>
+                    </div>
+                    <div class="flex gap-2 mb-4">
+                        <button id="btnAdAction" onclick="addAd()" class="flex-1 bg-teal-500 hover:bg-teal-600 px-6 py-2 rounded-xl transition">إضافة</button>
+                        <button id="btnAdCancel" onclick="resetEditMode('Ad')" class="bg-red-500/50 hover:bg-red-500 px-4 py-2 rounded-xl transition hidden">إلغاء</button>
+                    </div>
+                    <div id="adsList" class="space-y-2"></div>
+                </div>
+
+                <div id="adminCategories" class="admin-section hidden">
+                    <div class="mb-4 flex gap-2">
+                        <input type="text" id="newCategory" placeholder="اسم القسم الجديد" class="flex-1 bg-transparent border border-gray-700 rounded-xl py-2 px-4">
+                        <button id="btnCategoryAction" onclick="addCategory()" class="bg-teal-500 hover:bg-teal-600 px-6 py-2 rounded-xl transition">إضافة</button>
+                        <button id="btnCategoryCancel" onclick="resetEditMode('Category')" class="bg-red-500/50 hover:bg-red-500 px-4 py-2 rounded-xl transition hidden">إلغاء</button>
+                    </div>
+                    <div id="categoriesList" class="space-y-2"></div>
+                </div>
+
+                <div id="adminGames" class="admin-section hidden">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <select id="gameCategory" class="bg-transparent border border-gray-700 rounded-xl py-2 px-4"></select>
+                        <input type="text" id="newGame" placeholder="اسم الخدمة (مثل: لاما لودو)" class="bg-transparent border border-gray-700 rounded-xl py-2 px-4">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm text-gray-400 mb-2">ملاحظات الخدمة (مثل: الشحن عبر الآيدي فقط)</label>
+                        <textarea id="gameNote" placeholder="اكتب تفاصيل الخدمة أو طريقة الشحن هنا..." class="w-full bg-transparent border border-gray-700 rounded-xl py-2 px-4 focus:border-orange-500 h-20"></textarea>
+                    </div>
+                    <div class="flex gap-2 mb-4">
+                        <button id="btnGameAction" onclick="addGame()" class="flex-1 bg-teal-500 hover:bg-teal-600 px-6 py-2 rounded-xl transition">إضافة خدمة</button>
+                        <button id="btnGameCancel" onclick="resetEditMode('Game')" class="bg-red-500/50 hover:bg-red-500 px-4 py-2 rounded-xl transition hidden">إلغاء</button>
+                    </div>
+                    <div id="gamesList" class="space-y-2"></div>
+                </div>
+
+                <div id="adminServices" class="admin-section hidden">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <select id="serviceGame" class="bg-transparent border border-gray-700 rounded-xl py-2 px-4"></select>
+                        <input type="text" id="serviceName" placeholder="اسم الباقة (مثال: 60 شدة)" class="bg-transparent border border-gray-700 rounded-xl py-2 px-4">
+                        <input type="number" id="servicePrice" placeholder="السعر" class="bg-transparent border border-gray-700 rounded-xl py-2 px-4">
+                    </div>
+                    <div class="flex gap-2 mb-4">
+                        <button id="btnServiceAction" onclick="addService()" class="flex-1 bg-teal-500 hover:bg-teal-600 px-6 py-2 rounded-xl transition">إضافة باقة</button>
+                        <button id="btnServiceCancel" onclick="resetEditMode('Service')" class="bg-red-500/50 hover:bg-red-500 px-4 py-2 rounded-xl transition hidden">إلغاء</button>
+                    </div>
+                    <div id="servicesList" class="space-y-2"></div>
+                </div>
+
+                <div id="adminBanks" class="admin-section hidden">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <input type="text" id="bankName" placeholder="اسم البنك" class="bg-transparent border border-gray-700 rounded-xl py-2 px-4">
+                        <input type="text" id="accountName" placeholder="اسم صاحب الحساب" class="bg-transparent border border-gray-700 rounded-xl py-2 px-4">
+                        <input type="text" id="accountNumber" placeholder="رقم الحساب" class="bg-transparent border border-gray-700 rounded-xl py-2 px-4">
+                    </div>
+                    <div class="mb-4">
+                        <input type="text" id="bankNote" placeholder="ملاحظة (اختياري) مثال: إيداع فقط، أو يرجى إرسال الإشعار..." class="w-full bg-transparent border border-gray-700 rounded-xl py-2 px-4">
+                    </div>
+                    <div class="flex gap-2 mb-4">
+                        <button id="btnBankAction" onclick="addBank()" class="flex-1 bg-teal-500 hover:bg-teal-600 px-6 py-2 rounded-xl transition">إضافة حساب</button>
+                        <button id="btnBankCancel" onclick="resetEditMode('Bank')" class="bg-red-500/50 hover:bg-red-500 px-4 py-2 rounded-xl transition hidden">إلغاء</button>
+                    </div>
+                    <div id="banksList" class="space-y-2"></div>
+                </div>
+
+                <div id="adminSettings" class="admin-section hidden">
+                    <div class="space-y-4">
+                        <div><label class="block text-sm mb-2">واتساب المدير</label><input type="text" id="adminWhatsapp" class="w-full bg-transparent border border-gray-700 rounded-xl py-2 px-4"></div>
+                        <div><label class="block text-sm mb-2">تغيير الشعار</label><input type="file" id="adminLogoUpload" accept="image/*" class="w-full bg-transparent border border-gray-700 rounded-xl py-2 px-4"></div>
+                        <button onclick="saveSettings()" class="bg-orange-500 hover:bg-orange-600 px-6 py-2 rounded-xl transition">حفظ الإعدادات</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rejection Modal -->
+    <div id="rejectionModal" class="fixed inset-0 bg-black bg-opacity-90 backdrop-blur-sm hidden items-center justify-center z-[60]" onclick="if(event.target===this) hideModal('rejectionModal')">
+        <div class="glass rounded-2xl p-6 max-w-sm w-full mx-4 modal-enter">
+            <h3 class="text-xl font-bold text-red-500 mb-4">رفض الطلب</h3>
+            <input type="text" id="rejectionReasonInput" placeholder="سبب الرفض (اختياري)" class="w-full bg-transparent border border-gray-700 rounded-xl py-2 px-4 mb-4 focus:border-red-500 focus:outline-none">
+            <input type="hidden" id="orderToRejectId">
+            <div class="flex gap-2">
+                <button onclick="confirmReject()" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-xl transition">تأكيد الرفض</button>
+                <button onclick="hideModal('rejectionModal')" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 rounded-xl transition">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Orders Modal -->
+    <div id="ordersModal" class="fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm hidden items-center justify-center z-50" onclick="if(event.target===this) hideModal('ordersModal')">
+        <div class="glass rounded-2xl p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto modal-enter">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-orange-500">سجل طلباتي</h3>
+                <button onclick="hideModal('ordersModal')" class="text-gray-400 hover:text-white"><i data-lucide="x" class="w-6 h-6"></i></button>
+            </div>
+            <div class="glass p-4 rounded-xl mb-4 border border-white/5 bg-white/5">
+                <p class="text-xs text-gray-400 mb-2">أدخل الآيدي (ID) الخاص بك لعرض طلباتك</p>
+                <div class="flex gap-2">
+                    <input type="text" id="myOrdersSearchId" placeholder="اكتب الآيدي هنا..." class="flex-1 bg-transparent border border-gray-600 rounded-lg py-1.5 px-3 text-sm focus:border-orange-500 focus:outline-none">
+                    <button onclick="searchMyOrders()" class="bg-orange-600 hover:bg-orange-500 text-white px-4 py-1.5 rounded-lg text-sm font-bold transition">بحث</button>
+                </div>
+            </div>
+            <div id="ordersList" class="space-y-3"></div>
+        </div>
+    </div>
+
+    <!-- Banks Modal -->
+    <div id="banksModal" class="fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm hidden items-center justify-center z-50" onclick="if(event.target===this) hideModal('banksModal')">
+        <div class="glass rounded-2xl p-6 max-w-md w-full mx-4 modal-enter">
+            <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold text-teal-500">الحسابات البنكية</h3><button onclick="hideModal('banksModal')" class="text-gray-400 hover:text-white"><i data-lucide="x" class="w-6 h-6"></i></button></div>
+            <div id="banksListDisplay" class="space-y-3"></div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-5 left-1/2 transform -translate-x-1/2 bg-white text-black px-6 py-3 rounded-full shadow-2xl transition-all duration-300 translate-y-20 opacity-0 z-[100] font-bold">تم الحفظ بنجاح</div>
+
+    <script>
+        // Data Structure with Requested Data
+        let storeData = { 
+            categories: ['قسم التطبيقات', 'قسم الألعاب', 'قسم الاشتراكات', 'قسم البطائق'], 
+            ads: [{text: 'مرحباً بك في ويب ستور', icon: 'zap'}], 
+            games: [
+                { name: 'لاما لودو Lama Ludo', category: 'قسم التطبيقات', icon: '🎲', note: 'شحن ماسات تطبيق لاما لودو من خلال المعرف (ID) فقط' },
+                { name: 'بوبجي موبايل العالمية', category: 'قسم الألعاب', icon: '🔫', note: 'الشحن عن طريق الايدي' },
+                { name: 'شاهد في اي بي Shahid VIP', category: 'قسم الاشتراكات', icon: '📺', note: 'يتم تجديد الاشتراك عبر إرسال الحساب (الإيميل)، ويتم التفعيل خلال وقت قصير من تأكيد الدفع. تفعيل عبر البريد الإلكتروني فقط.' },
+                { name: 'بطاقات آيتونز امريكي', category: 'قسم البطائق', icon: '🍏', note: 'من خلال الكود ارسال كود البطاقه للعميل فقط. أسعار البطاقات الرسمية بالريال اليمني' }
+            ], 
+            services: [
+                // Lama Ludo
+                { game: 'لاما لودو Lama Ludo', name: '150,000 جوهرة 💎', price: 392 },
+                { game: 'لاما لودو Lama Ludo', name: '300,000 جوهرة 💎', price: 784 },
+                { game: 'لاما لودو Lama Ludo', name: '450,000 جوهرة 💎', price: 1176 },
+                { game: 'لاما لودو Lama Ludo', name: '600,000 جوهرة 💎', price: 1568 },
+                { game: 'لاما لودو Lama Ludo', name: '750,000 جوهرة 💎', price: 1960 },
+                { game: 'لاما لودو Lama Ludo', name: '900,000 جوهرة 💎', price: 2358 },
+                { game: 'لاما لودو Lama Ludo', name: '1,000,000 جوهرة 💎', price: 2615 },
+                { game: 'لاما لودو Lama Ludo', name: '2,000,000 جوهرة 💎', price: 5236 },
+                { game: 'لاما لودو Lama Ludo', name: '5,000,000 جوهرة 💎', price: 13082 },
+                { game: 'لاما لودو Lama Ludo', name: '10,000,000 جوهرة 💎', price: 26169 },
+                { game: 'لاما لودو Lama Ludo', name: '15,000,000 جوهرة 💎', price: 39250 },
+                // PUBG
+                { game: 'بوبجي موبايل العالمية', name: '60 شدة', price: 491 },
+                { game: 'بوبجي موبايل العالمية', name: '325 شدة', price: 2456 },
+                { game: 'بوبجي موبايل العالمية', name: '385 شدة', price: 2947 },
+                { game: 'بوبجي موبايل العالمية', name: '660 شدة', price: 4911 },
+                { game: 'بوبجي موبايل العالمية', name: '720 شدة', price: 5402 },
+                { game: 'بوبجي موبايل العالمية', name: '1800 شدة', price: 12279 },
+                { game: 'بوبجي موبايل العالمية', name: '3850 شدة', price: 24557 },
+                { game: 'بوبجي موبايل العالمية', name: '8100 شدة', price: 49113 },
+                { game: 'بوبجي موبايل العالمية', name: '8400 شدة', price: 51569 },
+                { game: 'بوبجي موبايل العالمية', name: '11950 شدة', price: 73669 },
+                { game: 'بوبجي موبايل العالمية', name: '16200 شدة', price: 98226 },
+                { game: 'بوبجي موبايل العالمية', name: '24300 شدة', price: 147339 },
+                { game: 'بوبجي موبايل العالمية', name: '32400 شدة', price: 196452 },
+                // Shahid
+                { game: 'شاهد في اي بي Shahid VIP', name: 'شاهد VIP – 3 أشهر', price: 15500 },
+                { game: 'شاهد في اي بي Shahid VIP', name: 'شاهد VIP – سنة كاملة', price: 50000 },
+                // iTunes
+                { game: 'بطاقات آيتونز امريكي', name: 'آيتونز – 2 دولار', price: 1103 },
+                { game: 'بطاقات آيتونز امريكي', name: 'آيتونز – 3 دولار', price: 1652 },
+                { game: 'بطاقات آيتونز امريكي', name: 'آيتونز – 5 دولار', price: 2755 },
+                { game: 'بطاقات آيتونز امريكي', name: 'آيتونز – 10 دولار', price: 5510 },
+                { game: 'بطاقات آيتونز امريكي', name: 'آيتونز – 15 دولار', price: 8266 },
+                { game: 'بطاقات آيتونز امريكي', name: 'آيتونز – 20 دولار', price: 11021 },
+                { game: 'بطاقات آيتونز امريكي', name: 'آيتونز – 25 دولار', price: 13776 },
+                { game: 'بطاقات آيتونز امريكي', name: 'آيتونز – 50 دولار', price: 27552 },
+                { game: 'بطاقات آيتونز امريكي', name: 'آيتونز – 100 دولار', price: 55104 },
+            ], 
+            banks: [], 
+            orders: [], 
+            settings: { whatsapp: '967700000000', logo: null }, 
+            lastOrderId: 1000 
+        };
+        let editMode = { type: null, index: null, originalKey: null };
+        let currentOrderFilter = 'all';
+
+        // Load & Save
+        function loadData() {
+            const saved = localStorage.getItem('webstore_data');
+            if (saved) { 
+                try { 
+                    const parsed = JSON.parse(saved);
+                    // Merge saved data carefully to keep new structure if reset
+                    if(parsed.games && parsed.games.length > 0) storeData = { ...storeData, ...parsed };
+                } catch(e){} 
+            }
+            if (storeData.settings.logo) { document.getElementById('headerLogo').src = storeData.settings.logo; document.getElementById('footerLogo').src = storeData.settings.logo; }
+        }
+        function saveData() { localStorage.setItem('webstore_data', JSON.stringify(storeData)); renderAll(); }
+        function showToast(msg) { const t = document.getElementById('toast'); t.innerText = msg; t.classList.remove('translate-y-20', 'opacity-0'); setTimeout(()=>t.classList.add('translate-y-20', 'opacity-0'), 2000); }
+
+        // Render All UI
+        function renderAll() { renderSlider(); renderCategories(); renderServices(); }
+
+        // UI Functions
+        function renderSlider() {
+            const track = document.getElementById('sliderTrack');
+            if(storeData.ads.length === 0) { track.innerHTML = '<div class="text-gray-500 p-4">لا توجد إعلانات</div>'; return; }
+            const adsHtml = storeData.ads.map(ad => `<div class="flex-shrink-0 w-64 glass-card p-3 rounded-xl flex items-center gap-3"><i data-lucide="${ad.icon}" class="w-5 h-5 text-orange-500"></i><span class="font-medium text-sm">${ad.text}</span></div>`).join('');
+            track.innerHTML = adsHtml + adsHtml + adsHtml; lucide.createIcons();
+        }
+        function renderCategories() {
+            const container = document.getElementById('categoriesTabs');
+            container.innerHTML = storeData.categories.map((cat, i) => `<button onclick="filterByCategory('${cat}', this)" class="px-4 py-2 rounded-lg transition ${i===0 ? 'tab-active' : 'glass-card hover:border-orange-500'}">${cat}</button>`).join('');
+        }
+        function renderServices(filterText='', category) {
+            const activeCat = category || document.querySelector('.tab-active')?.textContent || storeData.categories[0];
+            let filtered = storeData.games.filter(g => g.category === activeCat);
+            if(filterText) filtered = filtered.filter(g => g.name.includes(filterText));
+            
+            document.getElementById('servicesGrid').innerHTML = filtered.map(g => `
+                <div class="glass-card rounded-xl p-4 cursor-pointer hover:scale-105 transition-all duration-300" onclick="showServiceModal('${g.name}')">
+                    <div class="text-4xl mb-2">🎁</div><h3 class="font-semibold text-lg">${g.name}</h3><p class="text-sm text-gray-400">${g.category}</p>
+                </div>`).join('');
+        }
+        function filterByCategory(cat, btn) {
+            document.querySelectorAll('#categoriesTabs button').forEach(b => b.className = 'px-4 py-2 rounded-lg transition glass-card hover:border-orange-500');
+            btn.className = 'px-4 py-2 rounded-lg transition tab-active';
+            renderServices(document.getElementById('searchInput').value, cat);
+        }
+        function filterServices() { renderServices(document.getElementById('searchInput').value); }
+
+        // Orders Logic
+        let selectedPrice = { name: '', price: 0 };
+        function showServiceModal(name) {
+            const modal = document.getElementById('orderModal');
+            document.getElementById('modalServiceName').innerText = name;
+            
+            // Show Note
+            const gameObj = storeData.games.find(g => g.name === name);
+            const noteDiv = document.getElementById('serviceNoteDisplay');
+            const noteText = document.getElementById('serviceNoteText');
+            if(gameObj && gameObj.note) {
+                noteText.innerText = gameObj.note;
+                noteDiv.classList.remove('hidden');
+            } else {
+                noteDiv.classList.add('hidden');
+            }
+
+            const prices = storeData.services.filter(s => s.game === name);
+            document.getElementById('servicePrices').innerHTML = prices.length ? prices.map(s => `
+                <div class="glass-card p-3 rounded-xl flex justify-between items-center hover:border-orange-500 transition cursor-pointer" onclick="selectPrice('${s.name}', ${s.price}, this)">
+                    <span>${s.name}</span><span class="text-orange-500 font-bold">${s.price} ريال</span>
+                </div>`).join('') : '<p class="text-gray-400">لا توجد أسعار</p>';
+            modal.classList.remove('hidden'); modal.classList.add('flex');
+            const savedId = localStorage.getItem('ws_user_id'); if(savedId) document.getElementById('userId').value = savedId;
+        }
+        function selectPrice(name, price, el) {
+            selectedPrice = { name, price };
+            document.querySelectorAll('#servicePrices > div').forEach(d => d.classList.remove('border-orange-500', 'border-2'));
+            el.classList.add('border-orange-500', 'border-2');
+        }
+        function sendToWhatsApp() {
+            const service = document.getElementById('modalServiceName').innerText;
+            const userId = document.getElementById('userId').value.trim();
+            if(!userId || !selectedPrice.name) { alert('أكمل البيانات'); return; }
+            localStorage.setItem('ws_user_id', userId);
+            const num = ++storeData.lastOrderId;
+            const order = { id: Date.now(), orderNumber: num, service, type: selectedPrice.name, price: selectedPrice.price, userId, date: new Date().toLocaleString('ar-EG'), status: 'pending' };
+            storeData.orders.push(order); saveData();
+            const msg = `──────⊹⊱✫⊰⊹──────
+🌟 ويب ستور | WebStor 🌟
+متجرك الرقمي الأول في اليمن
+──────⊹⊱✫⊰⊹──────
+*طلب جديد (رقم العملية: ${num})*
+------------------
+🔹 *الخدمة:* ${service}
+📦 *الباقة:* ${selectedPrice.name}
+💰 *السعر:* ${selectedPrice.price} ريال
+🆔 الآيدي: ${userId}
+------------------
+يرجى تنفيذ الطلب بأسرع وقت`;
+            window.open(`https://wa.me/${storeData.settings.whatsapp}?text=${encodeURIComponent(msg)}`, '_blank');
+            hideModal('orderModal');
+        }
+
+        // Admin Core
+        function checkAdminPassword() {
+            if(document.getElementById('adminPassword').value === '1234') {
+                document.getElementById('adminContent').classList.remove('hidden');
+                document.getElementById('adminPasswordDiv').classList.add('hidden');
+                refreshAllAdmin();
+            } else alert('خطأ');
+        }
+        function showAdminSection(sec) {
+            document.querySelectorAll('.admin-tab-btn').forEach(b => { b.classList.remove('bg-orange-500', 'text-white'); b.classList.add('glass-card'); });
+            event.currentTarget.classList.remove('glass-card'); event.currentTarget.classList.add('bg-orange-500', 'text-white');
+            document.querySelectorAll('.admin-section').forEach(s => s.classList.add('hidden'));
+            document.getElementById('admin'+sec.charAt(0).toUpperCase()+sec.slice(1)).classList.remove('hidden');
+        }
+        function refreshAllAdmin() { loadAdminOrders(); loadAdminAds(); loadAdminCategories(); loadAdminGames(); loadAdminServices(); loadAdminBanks(); populateSelects(); }
+        function populateSelects() {
+            const cats = storeData.categories.map(c => `<option value="${c}">${c}</option>`).join('');
+            document.getElementById('gameCategory').innerHTML = cats;
+            const games = storeData.games.map(g => `<option value="${g.name}">${g.name}</option>`).join('');
+            document.getElementById('serviceGame').innerHTML = games;
+        }
+
+        // CRUD Helpers
+        function resetEditMode(type) {
+            editMode = { type: null, index: null };
+            const btn = document.getElementById(`btn${type}Action`);
+            const cancelBtn = document.getElementById(`btn${type}Cancel`);
+            btn.innerText = 'إضافة'; btn.classList.replace('bg-blue-600', 'bg-teal-500');
+            cancelBtn.classList.add('hidden');
+            if(type==='Category') document.getElementById('newCategory').value = '';
+            else if(type==='Game') { document.getElementById('newGame').value = ''; document.getElementById('gameNote').value = ''; }
+            else if(type==='Service') { document.getElementById('serviceName').value = ''; document.getElementById('servicePrice').value = ''; }
+            else if(type==='Bank') { document.getElementById('bankName').value = ''; document.getElementById('accountName').value = ''; document.getElementById('accountNumber').value = ''; document.getElementById('bankNote').value = ''; }
+            else if(type==='Ad') document.getElementById('adText').value = '';
+        }
+        
+        function setEditMode(type, i) {
+            editMode = { type, index: i };
+            const btn = document.getElementById(`btn${type}Action`);
+            const cancelBtn = document.getElementById(`btn${type}Cancel`);
+            btn.innerText = 'حفظ التعديلات'; btn.classList.replace('bg-teal-500', 'bg-blue-600');
+            cancelBtn.classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' }); 
+        }
+
+        // CRUD: Categories
+        function addCategory() {
+            const val = document.getElementById('newCategory').value.trim(); if(!val) return;
+            if(editMode.type === 'Category') {
+                const oldVal = storeData.categories[editMode.index];
+                storeData.categories[editMode.index] = val;
+                storeData.games.forEach(g => { if(g.category === oldVal) g.category = val; });
+                resetEditMode('Category');
+            } else if(!storeData.categories.includes(val)) storeData.categories.push(val);
+            saveData(); loadAdminCategories(); showToast('تم الحفظ');
+        }
+        function loadAdminCategories() { document.getElementById('categoriesList').innerHTML = storeData.categories.map((c, i) => `<div class="glass-card p-3 rounded-xl flex justify-between"><span>${c}</span><div class="flex gap-2"><button onclick="setEditMode('Category', ${i}); document.getElementById('newCategory').value='${c}'" class="text-blue-400"><i data-lucide="pencil" class="w-4 h-4"></i></button><button onclick="deleteItem('categories', ${i})" class="text-red-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div></div>`).join(''); lucide.createIcons(); }
+
+        // CRUD: Games
+        function addGame() {
+            const name = document.getElementById('newGame').value.trim(); const cat = document.getElementById('gameCategory').value; const note = document.getElementById('gameNote').value; if(!name) return;
+            if(editMode.type === 'Game') {
+                const oldName = storeData.games[editMode.index].name;
+                storeData.games[editMode.index] = { name, category: cat, note: note };
+                storeData.services.forEach(s => { if(s.game === oldName) s.game = name; });
+                resetEditMode('Game');
+            } else storeData.games.push({ name, category: cat, note: note });
+            saveData(); loadAdminGames(); showToast('تم الحفظ');
+        }
+        function loadAdminGames() { document.getElementById('gamesList').innerHTML = storeData.games.map((g, i) => `<div class="glass-card p-3 rounded-xl flex justify-between"><div><span class="font-bold">${g.name}</span> <span class="text-xs text-gray-400">(${g.category})</span><div class="text-xs text-blue-300 mt-1">📝 ${g.note || 'لا توجد ملاحظات'}</div></div><div class="flex gap-2"><button onclick="setEditMode('Game', ${i}); document.getElementById('newGame').value='${g.name}'; document.getElementById('gameCategory').value='${g.category}'; document.getElementById('gameNote').value='${g.note||''}';" class="text-blue-400"><i data-lucide="pencil" class="w-4 h-4"></i></button><button onclick="deleteItem('games', ${i})" class="text-red-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div></div>`).join(''); lucide.createIcons(); }
+
+        // CRUD: Services
+        function addService() {
+            const game = document.getElementById('serviceGame').value; const name = document.getElementById('serviceName').value; const price = document.getElementById('servicePrice').value; if(!name) return;
+            const obj = { game, name, price };
+            if(editMode.type === 'Service') { storeData.services[editMode.index] = obj; resetEditMode('Service'); } else storeData.services.push(obj);
+            saveData(); loadAdminServices(); showToast('تم الحفظ');
+        }
+        function loadAdminServices() { document.getElementById('servicesList').innerHTML = storeData.services.map((s, i) => `<div class="glass-card p-3 rounded-xl flex justify-between"><span>${s.game} - ${s.name} (${s.price})</span><div class="flex gap-2"><button onclick="setEditMode('Service', ${i}); document.getElementById('serviceGame').value='${s.game}'; document.getElementById('serviceName').value='${s.name}'; document.getElementById('servicePrice').value='${s.price}'" class="text-blue-400"><i data-lucide="pencil" class="w-4 h-4"></i></button><button onclick="deleteItem('services', ${i})" class="text-red-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div></div>`).join(''); lucide.createIcons(); }
+
+        // CRUD: Banks & Ads
+        function addBank() {
+            const name = document.getElementById('bankName').value; const acc = document.getElementById('accountName').value; const num = document.getElementById('accountNumber').value; 
+            const note = document.getElementById('bankNote').value;
+            if(!name || !num) return;
+            
+            const obj = { name, accountName: acc, number: num, note };
+            if(editMode.type === 'Bank') { storeData.banks[editMode.index] = obj; resetEditMode('Bank'); } else storeData.banks.push(obj);
+            saveData(); loadAdminBanks(); showToast('تم الحفظ');
+        }
+        function loadAdminBanks() { document.getElementById('banksList').innerHTML = storeData.banks.map((b, i) => `<div class="glass-card p-3 rounded-xl flex justify-between"><div><span class="font-bold">${b.name}</span> <span class="text-xs text-gray-400">${b.number}</span>${b.note ? `<div class="text-xs text-yellow-400 mt-1">📝 ${b.note}</div>` : ''}</div><div class="flex gap-2"><button onclick="setEditMode('Bank', ${i}); document.getElementById('bankName').value='${b.name}'; document.getElementById('accountName').value='${b.accountName}'; document.getElementById('accountNumber').value='${b.number}'; document.getElementById('bankNote').value='${b.note||''}';" class="text-blue-400"><i data-lucide="pencil" class="w-4 h-4"></i></button><button onclick="deleteItem('banks', ${i})" class="text-red-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div></div>`).join(''); lucide.createIcons(); }
+        
+        function addAd() {
+            const text = document.getElementById('adText').value; if(!text) return;
+            storeData.ads.push({ text, icon: document.getElementById('adIcon').value });
+            saveData(); loadAdminAds(); showToast('تمت الإضافة'); document.getElementById('adText').value = '';
+        }
+        function loadAdminAds() { document.getElementById('adsList').innerHTML = storeData.ads.map((a, i) => `<div class="glass-card p-3 rounded-xl flex justify-between"><span>${a.text}</span><button onclick="deleteItem('ads', ${i})" class="text-red-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div>`).join(''); lucide.createIcons(); }
+
+        // Generic Delete
+        function deleteItem(key, index) {
+            if(confirm('هل أنت متأكد من الحذف؟')) {
+                if(key === 'categories') {
+                    const catName = storeData.categories[index];
+                    storeData.games = storeData.games.filter(g => g.category !== catName);
+                } else if(key === 'games') {
+                    const gameName = storeData.games[index].name;
+                    storeData.services = storeData.services.filter(s => s.game !== gameName);
+                }
+                storeData[key].splice(index, 1);
+                saveData();
+                refreshAllAdmin(); 
+                showToast('تم الحذف');
+            }
+        }
+
+        // Orders Management
+        function filterAdminOrders(status) {
+            currentOrderFilter = status;
+            document.querySelectorAll('.order-filter-btn').forEach(b => { b.classList.remove('order-tab-active'); b.classList.add('order-tab-inactive'); });
+            document.getElementById('filter-'+status).classList.add('order-tab-active');
+            loadAdminOrders();
+        }
+        function searchAdminOrders() { loadAdminOrders(); }
+        function loadAdminOrders() {
+            const listDiv = document.getElementById('adminOrdersList');
+            const search = document.getElementById('adminOrderSearch').value.toLowerCase();
+            let orders = storeData.orders.slice().reverse();
+            if(currentOrderFilter !== 'all') orders = orders.filter(o => o.status === currentOrderFilter);
+            if(search) orders = orders.filter(o => (o.orderNumber && o.orderNumber.toString().includes(search)) || o.service.includes(search) || o.userId.includes(search));
+            
+            const badge = document.getElementById('ordersCountBadge');
+            if(badge) badge.innerText = `${orders.length} طلب`;
+            
+            if(!orders.length) { 
+                if(listDiv) listDiv.innerHTML = '<p class="text-center text-gray-500">لا توجد طلبات</p>'; 
+                return; 
+            }
+
+            if(listDiv) {
+                listDiv.innerHTML = orders.map(o => `
+                    <div class="glass-card p-4 rounded-xl border ${o.status==='completed'?'border-green-500/50':o.status==='rejected'?'border-red-500/50':o.status==='processing'?'border-blue-500/50':'border-white/5'}">
+                        <div class="flex justify-between items-start mb-2">
+                            <div>
+                                <span class="bg-slate-700 px-2 py-1 rounded text-xs">#${o.orderNumber}</span>
+                                <span class="font-bold mr-2 text-orange-400">${o.service}</span>
+                                <div class="text-sm text-gray-300 mt-1">${o.type} | ID: <span class="font-mono bg-white/10 px-1 rounded select-all">${o.userId}</span></div>
+                            </div>
+                            <div class="text-left"><div class="font-bold text-teal-400">${o.price} ريال</div><div class="text-[10px] text-gray-500">${o.date}</div></div>
+                        </div>
+                        <div class="flex flex-wrap gap-2 pt-2 border-t border-white/10 mt-2">
+                            ${o.status === 'pending' ? `<button onclick="updateStatus(${o.id}, 'processing')" class="flex-1 bg-blue-600/30 text-blue-300 py-1.5 rounded text-xs font-bold border border-blue-500/30">تجهيز ⚡</button><button onclick="openReject(${o.id})" class="flex-1 bg-red-600/30 text-red-300 py-1.5 rounded text-xs font-bold border border-red-500/30">رفض ❌</button>` : ''}
+                            ${o.status === 'processing' ? `<button onclick="updateStatus(${o.id}, 'completed')" class="flex-1 bg-green-600/30 text-green-300 py-1.5 rounded text-xs font-bold border border-green-500/30">إكمال ✅</button><button onclick="openReject(${o.id})" class="flex-1 bg-red-600/30 text-red-300 py-1.5 rounded text-xs font-bold border border-red-500/30">رفض ❌</button>` : ''}
+                            ${o.status !== 'pending' ? `<button onclick="updateStatus(${o.id}, 'pending')" class="px-3 bg-yellow-600/30 text-yellow-300 rounded text-xs font-bold border border-yellow-500/30">↩️</button>` : ''}
+                            <button onclick="deleteOrder(${o.id})" class="px-3 bg-gray-700 hover:bg-red-500 rounded transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </div>
+                    </div>
+                `).join('');
+                lucide.createIcons();
+            }
+        }
+        function updateStatus(id, st) { const o = storeData.orders.find(x => x.id === id); if(o){ o.status = st; if(st !== 'rejected') o.rejectReason = ''; saveData(); loadAdminOrders(); } }
+        function openReject(id) { document.getElementById('orderToRejectId').value = id; document.getElementById('rejectionModal').classList.remove('hidden'); document.getElementById('rejectionModal').classList.add('flex'); }
+        function confirmReject() { 
+            const id = parseInt(document.getElementById('orderToRejectId').value);
+            const reason = document.getElementById('rejectionReasonInput').value;
+            const o = storeData.orders.find(x => x.id === id);
+            if(o) { o.status = 'rejected'; o.rejectReason = reason || 'لم يتم تحديد سبب'; saveData(); loadAdminOrders(); hideModal('rejectionModal'); }
+        }
+        function deleteOrder(id) { if(confirm('حذف نهائي؟')) { storeData.orders = storeData.orders.filter(x => x.id !== id); saveData(); loadAdminOrders(); } }
+
+        // User Orders Search
+        function searchMyOrders() { const id = document.getElementById('myOrdersSearchId').value.trim(); if(id) { localStorage.setItem('ws_user_id', id); renderUserOrders(id); } }
+        function renderUserOrders(id) {
+            const list = document.getElementById('ordersList');
+            const my = storeData.orders.filter(o => o.userId === id).reverse();
+            if(!my.length) { list.innerHTML = '<p class="text-center text-gray-500 py-4">لا توجد طلبات لهذا الرقم</p>'; return; }
+            list.innerHTML = my.map(o => `
+                <div class="glass-card p-4 rounded-xl border ${o.status==='completed'?'border-green-500/30':o.status==='rejected'?'border-red-500/30':'border-white/5'}">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div class="flex items-center gap-2 mb-1"><span class="text-xs bg-slate-700 px-1 rounded">#${o.orderNumber}</span> <span class="font-bold text-orange-400">${o.service}</span></div>
+                            <div class="text-xs text-gray-400">${o.type}</div>
+                            <div class="mt-2 text-xs font-bold ${o.status==='completed'?'text-green-400':o.status==='rejected'?'text-red-400':o.status==='processing'?'text-blue-400':'text-yellow-400'}">${o.status==='completed'?'مكتمل':o.status==='rejected'?'مرفوض':o.status==='processing'?'قيد التجهيز':'قيد المراجعة'}</div>
+                            ${o.rejectReason ? `<div class="text-[10px] text-red-300 mt-1 bg-red-900/20 p-1 rounded">السبب: ${o.rejectReason}</div>` : ''}
+                        </div>
+                        <div class="text-left"><div class="font-bold text-teal-500">${o.price}</div><div class="text-[9px] text-gray-500">${o.date.split(',')[0]}</div></div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        function showOrders() { 
+            const modal = document.getElementById('ordersModal'); modal.classList.remove('hidden'); modal.classList.add('flex');
+            const saved = localStorage.getItem('ws_user_id');
+            if(saved) { document.getElementById('myOrdersSearchId').value = saved; renderUserOrders(saved); }
+            else document.getElementById('ordersList').innerHTML = '<p class="text-gray-500 text-center">أدخل الآيدي للبحث</p>';
+        }
+
+        // Helpers
+        function showAdminPanel() { document.getElementById('adminModal').classList.remove('hidden'); document.getElementById('adminModal').classList.add('flex'); document.getElementById('adminContent').classList.add('hidden'); document.getElementById('adminPasswordDiv').classList.remove('hidden'); document.getElementById('adminPassword').value=''; }
+        function hideModal(id) { document.getElementById(id).classList.add('hidden'); document.getElementById(id).classList.remove('flex'); }
+        function showBanks() { const m = document.getElementById('banksModal'); m.classList.remove('hidden'); m.classList.add('flex'); document.getElementById('banksListDisplay').innerHTML = storeData.banks.map(b => `<div class="glass-card p-4 rounded-xl"><div class="flex justify-between items-center mb-1"><span class="font-bold text-teal-400">${b.name}</span><button onclick="navigator.clipboard.writeText('${b.number}'); showToast('تم النسخ')" class="text-gray-400"><i data-lucide="copy" class="w-4 h-4"></i></button></div><div class="text-sm">${b.accountName}</div><div class="font-mono bg-black/20 p-2 rounded mt-1">${b.number}</div>${b.note ? `<div class="text-xs text-yellow-400 mt-1">📝 ${b.note}</div>` : ''}</div>`).join(''); lucide.createIcons(); }
+        function saveSettings() { storeData.settings.whatsapp = document.getElementById('adminWhatsapp').value; saveData(); showToast('تم الحفظ'); }
+        function updateLogo(input) { if(input.files[0]) { const r = new FileReader(); r.onload = e => { storeData.settings.logo = e.target.result; saveData(); loadData(); }; r.readAsDataURL(input.files[0]); } }
+
+        // Init
+        loadData(); renderAll(); lucide.createIcons();
+        if (!localStorage.getItem('webstore_data')) saveData();
+    </script>
+</body>
+</html>
