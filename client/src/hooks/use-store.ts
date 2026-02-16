@@ -195,6 +195,53 @@ export function useDeleteBank() {
   });
 }
 
+// Service Groups
+export function useServiceGroups() {
+  return useQuery({
+    queryKey: ["/api/service-groups"],
+    queryFn: async () => {
+      const res = await fetch("/api/service-groups");
+      if (!res.ok) throw new Error("Failed to fetch service groups");
+      return await res.json();
+    },
+  });
+}
+
+export function useCreateServiceGroup() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const res = await fetch("/api/service-groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to create service group");
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/service-groups"] });
+      toast({ title: "تم إضافة الخدمة الرئيسية بنجاح" });
+    },
+  });
+}
+
+export function useDeleteServiceGroup() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/service-groups/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete service group");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/service-groups"] });
+      toast({ title: "تم حذف الخدمة الرئيسية" });
+    },
+  });
+}
+
 // Settings
 export function useSettings() {
   return useQuery({
