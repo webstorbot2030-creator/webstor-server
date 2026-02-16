@@ -12,7 +12,7 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { useSettings } from "@/hooks/use-store";
+import { useSettings, useServiceGroups } from "@/hooks/use-store";
 
 const orderSchema = z.object({
   userInputId: z.string().min(1, "هذا الحقل مطلوب"),
@@ -31,6 +31,10 @@ export function OrderModal({ service, open, onOpenChange }: OrderModalProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { data: settings } = useSettings();
+  const { data: groups } = useServiceGroups();
+
+  const currentGroup = groups?.find((g: any) => g.id === service?.serviceGroupId);
+  const isAuthInput = currentGroup?.inputType === 'auth';
 
   const form = useForm<z.infer<typeof orderSchema>>({
     resolver: zodResolver(orderSchema),
@@ -147,13 +151,21 @@ export function OrderModal({ service, open, onOpenChange }: OrderModalProps) {
                 name="userInputId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>الآيدي / الرقم / المعرف</FormLabel>
+                    <FormLabel>{isAuthInput ? "البريد الإلكتروني وكلمة المرور" : "الآيدي / الرقم / المعرف"}</FormLabel>
                     <FormControl>
-                      <Input 
-                        placeholder="أدخل المعرف الخاص بك هنا..." 
-                        {...field} 
-                        className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-primary h-12"
-                      />
+                      {isAuthInput ? (
+                        <textarea
+                          placeholder="مثلاً:&#10;example@mail.com&#10;password123"
+                          {...field}
+                          className="w-full bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-gray-500 focus:border-primary p-3 min-h-[100px] outline-none"
+                        />
+                      ) : (
+                        <Input 
+                          placeholder="أدخل المعرف الخاص بك هنا..." 
+                          {...field} 
+                          className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-primary h-12"
+                        />
+                      )}
                     </FormControl>
                     <FormMessage />
                   </FormItem>

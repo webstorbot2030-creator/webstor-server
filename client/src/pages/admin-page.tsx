@@ -253,7 +253,7 @@ function ServiceGroupsManager() {
   const [selectedGroup, setSelectedGroup] = useState<number | null>(null);
 
   const groupForm = useForm({
-    defaultValues: { name: "", categoryId: "", note: "", image: "" }
+    defaultValues: { name: "", categoryId: "", note: "", image: "", inputType: "id" }
   });
 
   const serviceForm = useForm({
@@ -303,6 +303,13 @@ function ServiceGroupsManager() {
               <div className="space-y-2">
                 <label className="text-sm text-slate-400">إيموجي أو رابط صورة</label>
                 <Input {...groupForm.register("image")} placeholder="💎" className="bg-black/20 border-white/10 h-11" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm text-slate-400">تنسيق الطلب</label>
+                <select {...groupForm.register("inputType")} className="w-full bg-black/20 border border-white/10 rounded-xl h-11 px-3 text-sm focus:border-primary outline-none" required>
+                  <option value="id" className="bg-slate-900">آيدي / رقم (ID)</option>
+                  <option value="auth" className="bg-slate-900">بريد الكتروني وكلمة مرور</option>
+                </select>
               </div>
               <Button type="submit" className="w-full bg-primary hover:bg-primary/90 h-11 rounded-xl shadow-lg shadow-primary/20">إضافة الخدمة الرئيسية</Button>
             </form>
