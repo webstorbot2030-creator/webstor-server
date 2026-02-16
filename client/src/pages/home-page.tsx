@@ -3,19 +3,11 @@ import { AdsSlider } from "@/components/ads-slider";
 import { useCategories, useServices } from "@/hooks/use-store";
 import { useState } from "react";
 import { GlassCard } from "@/components/ui/glass-card";
-import { Search, Package, Gamepad2, CreditCard, Smartphone } from "lucide-react";
+import { Search, Gamepad2, CreditCard, Smartphone, Package } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { OrderModal } from "@/components/order-modal";
-import { Service } from "@shared/schema";
+import { Service, ServiceGroup } from "@shared/schema";
 import { motion, AnimatePresence } from "framer-motion";
-
-// Icons mapping for categories if stored as strings
-const catIcons: Record<string, any> = {
-  'apps': Smartphone,
-  'games': Gamepad2,
-  'cards': CreditCard,
-  'subs': Package,
-};
 
 export default function HomePage() {
   const { data: categories, isLoading: catLoading } = useCategories();
@@ -27,8 +19,9 @@ export default function HomePage() {
   const [orderModalOpen, setOrderModalOpen] = useState(false);
 
   // Filter services
-  const filteredServices = services?.filter(s => {
-    const matchesCategory = activeCategory === 'all' || s.categoryId === activeCategory;
+  const filteredServices = (services as (Service & { serviceGroup?: ServiceGroup })[] | undefined)?.filter(s => {
+    const categoryId = s.serviceGroup?.categoryId;
+    const matchesCategory = activeCategory === 'all' || categoryId === activeCategory;
     const matchesSearch = s.name.toLowerCase().includes(search.toLowerCase());
     return matchesCategory && matchesSearch;
   });
@@ -70,7 +63,7 @@ export default function HomePage() {
             >
               الكل
             </button>
-            {categories?.map((cat) => (
+            {categories?.map((cat: any) => (
               <button
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}
@@ -99,7 +92,7 @@ export default function HomePage() {
             className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"
           >
             <AnimatePresence>
-              {filteredServices?.map((service) => (
+              {filteredServices?.map((service: any) => (
                 <GlassCard 
                   key={service.id}
                   onClick={() => handleServiceClick(service)}
@@ -132,7 +125,7 @@ export default function HomePage() {
           </motion.div>
         )}
 
-        {filteredServices?.length === 0 && (
+        {(filteredServices?.length === 0 || !filteredServices) && !servLoading && (
           <div className="text-center py-20 text-gray-500">
             لا توجد خدمات مطابقة للبحث
           </div>

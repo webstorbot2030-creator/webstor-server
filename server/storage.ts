@@ -123,8 +123,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Services
-  async getServices(): Promise<Service[]> {
-    return await db.select().from(services);
+  async getServices(): Promise<(Service & { serviceGroup?: ServiceGroup })[]> {
+    return await db.query.services.findMany({
+      with: { group: true }
+    });
   }
 
   async getServicesByGroup(groupId: number): Promise<Service[]> {
