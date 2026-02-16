@@ -128,8 +128,11 @@ html:not(.dark) .glass-card:hover {
   height: 8px;
 }
 
-::-webkit-scrollbar-track {
+html.dark ::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.05);
+}
+html:not(.dark) ::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
 }
 
 ::-webkit-scrollbar-thumb {

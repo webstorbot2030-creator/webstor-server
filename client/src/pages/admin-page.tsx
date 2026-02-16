@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useAllOrders, useUpdateOrderStatus } from "@/hooks/use-orders";
 import { useCategories, useCreateCategory, useDeleteCategory, useServices, useCreateService, useDeleteService, useAds, useCreateAd, useDeleteAd, useBanks, useCreateBank, useDeleteBank, useSettings, useUpdateSettings, useServiceGroups, useCreateServiceGroup, useDeleteServiceGroup, useAdminUsers, useUpdateUser, useUpdateServiceGroup, useUpdateService } from "@/hooks/use-store";
-import { Loader2, Trash2, Plus, Check, X, LayoutDashboard, ShoppingBag, Package, ListTree, Megaphone, Landmark, Settings, ExternalLink, ShieldAlert, Users, Power, Image, Link, Eye, EyeOff, UserCog, Wallet, BarChart3, Download, Filter, TrendingUp, Clock, UserPlus, DollarSign, Activity, KeyRound, Lock, Mail, MessageCircle, Crown, Upload, ImageIcon, Wrench, Pencil, RotateCcw } from "lucide-react";
+import { Loader2, Trash2, Plus, Check, X, LayoutDashboard, ShoppingBag, Package, ListTree, Megaphone, Landmark, Settings, ExternalLink, ShieldAlert, Users, Power, Image, Link, Eye, EyeOff, UserCog, Wallet, BarChart3, Download, Filter, TrendingUp, Clock, UserPlus, DollarSign, Activity, KeyRound, Lock, Mail, MessageCircle, Crown, Upload, ImageIcon, Wrench, Pencil, RotateCcw, HardDrive, Calendar, FileDown } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -114,6 +114,10 @@ export default function AdminPage() {
                     <Activity className="w-4 h-4" />
                     <span>السجل</span>
                   </TabsTrigger>
+                  <TabsTrigger value="backups" className="data-[state=active]:bg-primary data-[state=active]:text-white px-4 py-2 rounded-xl transition-all flex gap-2 items-center text-xs">
+                    <HardDrive className="w-4 h-4" />
+                    <span>النسخ الاحتياطي</span>
+                  </TabsTrigger>
                   <TabsTrigger value="myaccount" className="data-[state=active]:bg-primary data-[state=active]:text-white px-4 py-2 rounded-xl transition-all flex gap-2 items-center text-xs">
                     <Lock className="w-4 h-4" />
                     <span>حسابي</span>
@@ -153,6 +157,9 @@ export default function AdminPage() {
               </TabsContent>
               <TabsContent value="activity" className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
                 <AdminActivityLogsManager />
+              </TabsContent>
+              <TabsContent value="backups" className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+                <BackupManager />
               </TabsContent>
               <TabsContent value="myaccount" className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
                 <AdminAccountManager />
@@ -926,6 +933,16 @@ function ServiceGroupsManager() {
   const { mutate: updateService } = useUpdateService();
 
   const [isUploading, setIsUploading] = useState(false);
+  const [editingGroupId, setEditingGroupId] = useState<number | null>(null);
+  const [editGroupName, setEditGroupName] = useState("");
+  const [editGroupImage, setEditGroupImage] = useState("");
+  const [editGroupNote, setEditGroupNote] = useState("");
+  const [editGroupInputType, setEditGroupInputType] = useState("id");
+  const [editGroupUploading, setEditGroupUploading] = useState(false);
+
+  const [editingServiceId, setEditingServiceId] = useState<number | null>(null);
+  const [editServiceName, setEditServiceName] = useState("");
+  const [editServicePrice, setEditServicePrice] = useState("");
 
   const groupForm = useForm({
     defaultValues: { name: "", categoryId: "", note: "", image: "", inputType: "id" }
@@ -949,6 +966,24 @@ function ServiceGroupsManager() {
     }
   };
 
+  const handleEditGroupImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setEditGroupUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Upload failed");
+      const { url } = await res.json();
+      setEditGroupImage(url);
+    } catch (error) {
+      console.error("Upload error:", error);
+    } finally {
+      setEditGroupUploading(false);
+    }
+  };
+
   const serviceForm = useForm({
     defaultValues: { name: "", price: "", serviceGroupId: "" }
   });
@@ -963,6 +998,32 @@ function ServiceGroupsManager() {
 
   const handleToggleGroup = (id: number, currentActive: boolean) => {
     updateGroup({ id, data: { active: !currentActive } });
+  };
+
+  const openEditGroup = (group: any) => {
+    setEditingGroupId(group.id);
+    setEditGroupName(group.name);
+    setEditGroupImage(group.image || "");
+    setEditGroupNote(group.note || "");
+    setEditGroupInputType(group.inputType || "id");
+  };
+
+  const saveEditGroup = () => {
+    if (!editingGroupId) return;
+    updateGroup({ id: editingGroupId, data: { name: editGroupName, image: editGroupImage, note: editGroupNote, inputType: editGroupInputType } });
+    setEditingGroupId(null);
+  };
+
+  const openEditService = (s: any) => {
+    setEditingServiceId(s.id);
+    setEditServiceName(s.name);
+    setEditServicePrice(String(s.price));
+  };
+
+  const saveEditService = () => {
+    if (!editingServiceId) return;
+    updateService({ id: editingServiceId, data: { name: editServiceName, price: Number(editServicePrice) } });
+    setEditingServiceId(null);
   };
 
   return (
@@ -980,7 +1041,7 @@ function ServiceGroupsManager() {
                 <label className="text-sm text-slate-400">القسم</label>
                 <select {...groupForm.register("categoryId")} className="w-full bg-black/20 border border-white/10 rounded-xl h-11 px-3 text-sm focus:border-primary outline-none" required>
                   <option value="" className="bg-slate-900">اختر القسم</option>
-                  {categories?.map(c => <option key={c.id} value={c.id} className="bg-slate-900">{c.name}</option>)}
+                  {categories?.map((c: any) => <option key={c.id} value={c.id} className="bg-slate-900">{c.name}</option>)}
                 </select>
               </div>
               <div className="space-y-2">
@@ -994,7 +1055,7 @@ function ServiceGroupsManager() {
                   <div className="relative">
                     <input type="file" id="image-upload" className="hidden" accept="image/*" onChange={handleFileUpload} disabled={isUploading} />
                     <Button type="button" variant="outline" className="h-11 px-3 border-white/10 bg-black/20 hover:bg-white/5" onClick={() => document.getElementById("image-upload")?.click()} disabled={isUploading}>
-                      {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                      {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                     </Button>
                   </div>
                 </div>
@@ -1027,7 +1088,7 @@ function ServiceGroupsManager() {
                 <label className="text-sm text-slate-400">الخدمة الرئيسية</label>
                 <select {...serviceForm.register("serviceGroupId")} className="w-full bg-black/20 border border-white/10 rounded-xl h-11 px-3 text-sm focus:border-primary outline-none" required>
                   <option value="" className="bg-slate-900">اختر الخدمة</option>
-                  {groups?.map(g => <option key={g.id} value={g.id} className="bg-slate-900">{g.name}</option>)}
+                  {groups?.map((g: any) => <option key={g.id} value={g.id} className="bg-slate-900">{g.name}</option>)}
                 </select>
               </div>
               <Button type="submit" className="w-full bg-teal-600 hover:bg-teal-700 h-11 rounded-xl">إضافة السعر</Button>
@@ -1055,6 +1116,51 @@ function ServiceGroupsManager() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
+                  <Dialog open={editingGroupId === group.id} onOpenChange={open => { if (!open) setEditingGroupId(null); }}>
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-blue-400 hover:bg-blue-500/10" onClick={() => openEditGroup(group)} data-testid={`edit-group-${group.id}`}>
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="bg-slate-900 border-white/10 text-white">
+                      <DialogHeader><DialogTitle>تعديل خدمة: {group.name}</DialogTitle></DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <label className="text-sm text-slate-400">اسم الخدمة</label>
+                          <Input value={editGroupName} onChange={e => setEditGroupName(e.target.value)} className="bg-black/20 border-white/10 h-12" data-testid="input-edit-group-name" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm text-slate-400">صورة / أيقونة</label>
+                          <div className="flex gap-2">
+                            <Input value={editGroupImage} onChange={e => setEditGroupImage(e.target.value)} placeholder="رابط أو إيموجي" className="bg-black/20 border-white/10 h-12" data-testid="input-edit-group-image" />
+                            <div className="relative">
+                              <input type="file" id={`edit-group-image-${group.id}`} className="hidden" accept="image/*" onChange={handleEditGroupImageUpload} disabled={editGroupUploading} />
+                              <Button type="button" variant="outline" className="h-12 px-3 border-white/10 bg-black/20 hover:bg-white/5" onClick={() => document.getElementById(`edit-group-image-${group.id}`)?.click()} disabled={editGroupUploading}>
+                                {editGroupUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                              </Button>
+                            </div>
+                          </div>
+                          {editGroupImage && (editGroupImage.startsWith('/') || editGroupImage.startsWith('http')) && (
+                            <div className="mt-2 w-16 h-16 rounded-xl overflow-hidden border border-white/10">
+                              <img src={editGroupImage} alt="preview" className="w-full h-full object-cover" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm text-slate-400">ملاحظة</label>
+                          <Input value={editGroupNote} onChange={e => setEditGroupNote(e.target.value)} className="bg-black/20 border-white/10 h-12" data-testid="input-edit-group-note" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm text-slate-400">تنسيق الطلب</label>
+                          <select value={editGroupInputType} onChange={e => setEditGroupInputType(e.target.value)} className="w-full bg-black/20 border border-white/10 rounded-xl h-12 px-3 text-sm focus:border-primary outline-none">
+                            <option value="id" className="bg-slate-900">آيدي / رقم (ID)</option>
+                            <option value="auth" className="bg-slate-900">بريد الكتروني وكلمة مرور</option>
+                          </select>
+                        </div>
+                        <Button className="w-full bg-primary hover:bg-primary/90 h-12 rounded-xl" onClick={saveEditGroup} data-testid="button-save-edit-group">حفظ التعديلات</Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                   <Button
                     variant="ghost" size="icon"
                     className={`h-8 w-8 rounded-lg ${group.active ? 'text-green-400 hover:bg-green-500/10' : 'text-red-400 hover:bg-red-500/10'}`}
@@ -1070,11 +1176,32 @@ function ServiceGroupsManager() {
               </div>
               <div className="p-3 bg-black/10">
                 <div className="space-y-2">
-                  {services?.filter(s => s.serviceGroupId === group.id).map(s => (
+                  {services?.filter((s: any) => s.serviceGroupId === group.id).map((s: any) => (
                     <div key={s.id} className={`flex justify-between items-center text-sm px-2 py-1.5 rounded-lg hover:bg-white/5 transition-colors ${!s.active ? 'opacity-40' : ''}`}>
                       <span className="text-slate-300">{s.name}</span>
                       <div className="flex items-center gap-3">
                         <span className="font-bold text-teal-400">{s.price.toLocaleString()} ر.ي</span>
+                        <Dialog open={editingServiceId === s.id} onOpenChange={open => { if (!open) setEditingServiceId(null); }}>
+                          <DialogTrigger asChild>
+                            <button className="text-blue-400 hover:text-blue-300 transition-colors" onClick={() => openEditService(s)} data-testid={`edit-service-${s.id}`}>
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                          </DialogTrigger>
+                          <DialogContent className="bg-slate-900 border-white/10 text-white">
+                            <DialogHeader><DialogTitle>تعديل: {s.name}</DialogTitle></DialogHeader>
+                            <div className="space-y-4 py-4">
+                              <div className="space-y-2">
+                                <label className="text-sm text-slate-400">اسم الفئة</label>
+                                <Input value={editServiceName} onChange={e => setEditServiceName(e.target.value)} className="bg-black/20 border-white/10 h-12" data-testid="input-edit-service-name" />
+                              </div>
+                              <div className="space-y-2">
+                                <label className="text-sm text-slate-400">السعر (ر.ي)</label>
+                                <Input value={editServicePrice} onChange={e => setEditServicePrice(e.target.value)} type="number" className="bg-black/20 border-white/10 h-12" data-testid="input-edit-service-price" />
+                              </div>
+                              <Button className="w-full bg-primary hover:bg-primary/90 h-12 rounded-xl" onClick={saveEditService} data-testid="button-save-edit-service">حفظ التعديلات</Button>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
                         <button className={`transition-colors ${s.active ? 'text-green-400 hover:text-green-300' : 'text-red-400 hover:text-red-300'}`} onClick={() => updateService({ id: s.id, data: { active: !s.active } })} data-testid={`toggle-service-${s.id}`}>
                           <Power className="w-3.5 h-3.5" />
                         </button>
@@ -1082,7 +1209,7 @@ function ServiceGroupsManager() {
                       </div>
                     </div>
                   ))}
-                  {services?.filter(s => s.serviceGroupId === group.id).length === 0 && (
+                  {services?.filter((s: any) => s.serviceGroupId === group.id).length === 0 && (
                     <p className="text-xs text-slate-600 text-center py-2">لا توجد فئات سعرية</p>
                   )}
                 </div>
@@ -1100,15 +1227,39 @@ function CategoriesManager() {
   const { mutate: createCat } = useCreateCategory();
   const { mutate: deleteCat } = useDeleteCategory();
   const [name, setName] = useState("");
+  const [catImage, setCatImage] = useState("");
+  const [catUploading, setCatUploading] = useState(false);
   const [editingCategory, setEditingCategory] = useState<any>(null);
   const [editCatName, setEditCatName] = useState("");
+  const [editCatImage, setEditCatImage] = useState("");
+  const [editCatUploading, setEditCatUploading] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  const handleCatImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, isEdit = false) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const setter = isEdit ? setEditCatImage : setCatImage;
+    const loadingSetter = isEdit ? setEditCatUploading : setCatUploading;
+    loadingSetter(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Upload failed");
+      const { url } = await res.json();
+      setter(url);
+    } catch {
+      toast({ title: "فشل رفع الصورة", variant: "destructive" });
+    } finally {
+      loadingSetter(false);
+    }
+  };
 
   const handleEditCategory = async () => {
     if (!editingCategory) return;
     try {
-      await apiRequest("PATCH", `/api/categories/${editingCategory.id}`, { name: editCatName });
+      await apiRequest("PATCH", `/api/categories/${editingCategory.id}`, { name: editCatName, image: editCatImage || undefined });
       queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
       toast({ title: "تم تحديث القسم" });
       setEditingCategory(null);
@@ -1120,24 +1271,44 @@ function CategoriesManager() {
   return (
     <div className="space-y-8">
       <Card className="bg-slate-900 border-white/5 p-6">
-        <div className="flex flex-col sm:flex-row gap-4 items-end">
-          <div className="flex-1 space-y-2">
-            <label className="text-sm text-slate-400">اسم القسم الجديد</label>
-            <Input value={name} onChange={e => setName(e.target.value)} placeholder="مثلاً: تطبيقات، ألعاب..." className="bg-black/20 border-white/10 h-12 text-lg" />
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row gap-4 items-end">
+            <div className="flex-1 space-y-2">
+              <label className="text-sm text-slate-400">اسم القسم الجديد</label>
+              <Input value={name} onChange={e => setName(e.target.value)} placeholder="مثلاً: تطبيقات، ألعاب..." className="bg-black/20 border-white/10 h-12 text-lg" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm text-slate-400">صورة القسم</label>
+              <div className="flex gap-2">
+                <Input value={catImage} onChange={e => setCatImage(e.target.value)} placeholder="رابط أو إيموجي" className="bg-black/20 border-white/10 h-12" />
+                <div className="relative">
+                  <input type="file" id="cat-image-upload" className="hidden" accept="image/*" onChange={e => handleCatImageUpload(e, false)} disabled={catUploading} />
+                  <Button type="button" variant="outline" className="h-12 px-3 border-white/10 bg-black/20 hover:bg-white/5" onClick={() => document.getElementById("cat-image-upload")?.click()} disabled={catUploading}>
+                    {catUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
-          <Button onClick={() => { createCat({ name }); setName(""); }} className="bg-primary h-12 px-8 rounded-xl font-bold shadow-lg shadow-primary/20">إضافة القسم</Button>
+          <Button onClick={() => { createCat({ name, image: catImage || undefined } as any); setName(""); setCatImage(""); }} className="bg-primary h-12 px-8 rounded-xl font-bold shadow-lg shadow-primary/20 w-full sm:w-auto">إضافة القسم</Button>
         </div>
       </Card>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        {categories?.map(c => (
+        {categories?.map((c: any) => (
           <Card key={c.id} className="bg-slate-900 border-white/5 group overflow-hidden hover:border-primary/30 transition-all">
             <div className="p-6 flex flex-col items-center gap-4 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center shadow-inner border border-white/5 group-hover:scale-110 transition-transform">
-                <LayoutDashboard className="w-8 h-8 text-primary" />
+              <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center shadow-inner border border-white/5 group-hover:scale-110 transition-transform overflow-hidden">
+                {c.image && (c.image.startsWith('/') || c.image.startsWith('http')) ? (
+                  <img src={c.image} alt={c.name} className="w-full h-full object-cover" />
+                ) : c.image ? (
+                  <span className="text-2xl">{c.image}</span>
+                ) : (
+                  <LayoutDashboard className="w-8 h-8 text-primary" />
+                )}
               </div>
               <span className="font-bold text-white text-lg">{c.name}</span>
               <div className="flex gap-2 w-full mt-2">
-                <Button variant="ghost" size="sm" className="text-blue-400 hover:bg-blue-500/10 flex-1" onClick={() => { setEditingCategory(c); setEditCatName(c.name); }} data-testid={`button-edit-category-${c.id}`}>
+                <Button variant="ghost" size="sm" className="text-blue-400 hover:bg-blue-500/10 flex-1" onClick={() => { setEditingCategory(c); setEditCatName(c.name); setEditCatImage(c.image || ""); }} data-testid={`button-edit-category-${c.id}`}>
                   <Pencil className="w-4 h-4 mr-2" /> تعديل
                 </Button>
                 <Button variant="ghost" size="sm" className="text-red-400 hover:bg-red-500/10 flex-1" onClick={() => deleteCat(c.id)}>
@@ -1155,6 +1326,23 @@ function CategoriesManager() {
             <div className="space-y-2">
               <label className="text-sm text-slate-400">اسم القسم</label>
               <Input value={editCatName} onChange={e => setEditCatName(e.target.value)} className="bg-black/20 border-white/10 h-12" data-testid="input-edit-category-name" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm text-slate-400">صورة / أيقونة القسم</label>
+              <div className="flex gap-2">
+                <Input value={editCatImage} onChange={e => setEditCatImage(e.target.value)} placeholder="رابط أو إيموجي" className="bg-black/20 border-white/10 h-12" data-testid="input-edit-category-image" />
+                <div className="relative">
+                  <input type="file" id="edit-cat-image-upload" className="hidden" accept="image/*" onChange={e => handleCatImageUpload(e, true)} disabled={editCatUploading} />
+                  <Button type="button" variant="outline" className="h-12 px-3 border-white/10 bg-black/20 hover:bg-white/5" onClick={() => document.getElementById("edit-cat-image-upload")?.click()} disabled={editCatUploading}>
+                    {editCatUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                  </Button>
+                </div>
+              </div>
+              {editCatImage && (editCatImage.startsWith('/') || editCatImage.startsWith('http')) && (
+                <div className="mt-2 w-16 h-16 rounded-xl overflow-hidden border border-white/10">
+                  <img src={editCatImage} alt="preview" className="w-full h-full object-cover" />
+                </div>
+              )}
             </div>
             <Button className="w-full bg-primary hover:bg-primary/90 h-12 rounded-xl" onClick={handleEditCategory} data-testid="button-save-category">حفظ التغييرات</Button>
           </div>
@@ -1882,6 +2070,194 @@ function AdminActivityLogsManager() {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function BackupManager() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [isCreating, setIsCreating] = useState(false);
+  const [resetConfirm, setResetConfirm] = useState<string | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
+
+  const { data: backups, isLoading } = useQuery({
+    queryKey: ["/api/admin/backups"],
+  });
+
+  const createBackup = async () => {
+    setIsCreating(true);
+    try {
+      await apiRequest("POST", "/api/admin/backups/create");
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/backups"] });
+      toast({ title: "تم إنشاء النسخة الاحتياطية بنجاح" });
+    } catch (e: any) {
+      toast({ title: e.message || "فشل إنشاء النسخة", variant: "destructive" });
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const deleteBackup = async (filename: string) => {
+    try {
+      await apiRequest("DELETE", `/api/admin/backups/${filename}`);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/backups"] });
+      toast({ title: "تم حذف النسخة الاحتياطية" });
+    } catch (e: any) {
+      toast({ title: e.message || "فشل الحذف", variant: "destructive" });
+    }
+  };
+
+  const downloadBackup = (filename: string) => {
+    window.open(`/api/admin/backups/download/${filename}`, '_blank');
+  };
+
+  const formatSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  const handleReset = async (type: string) => {
+    setIsResetting(true);
+    try {
+      await apiRequest("POST", `/api/admin/system/reset-${type}`);
+      queryClient.invalidateQueries();
+      toast({ title: "تمت العملية بنجاح" });
+      setResetConfirm(null);
+    } catch (e: any) {
+      toast({ title: e.message || "فشلت العملية", variant: "destructive" });
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card className="bg-slate-900 border-white/5">
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-xl flex items-center gap-3">
+              <HardDrive className="w-6 h-6 text-primary" />
+              النسخ الاحتياطي
+            </CardTitle>
+            <Button onClick={createBackup} disabled={isCreating} className="bg-primary hover:bg-primary/90 rounded-xl shadow-lg shadow-primary/20" data-testid="button-create-backup">
+              {isCreating ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <Plus className="w-4 h-4 ml-2" />}
+              إنشاء نسخة احتياطية
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-slate-400 mb-6">يتم حفظ بيانات النظام كاملة (المستخدمين، الطلبات، الخدمات، الإعدادات) في ملف JSON يمكنك تحميله.</p>
+
+          {isLoading ? (
+            <div className="flex justify-center py-8"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
+          ) : !backups || (backups as any[]).length === 0 ? (
+            <div className="text-center py-12 text-slate-500">
+              <HardDrive className="w-12 h-12 mx-auto mb-4 opacity-30" />
+              <p>لا توجد نسخ احتياطية بعد</p>
+              <p className="text-xs mt-1">اضغط على "إنشاء نسخة احتياطية" لإنشاء أول نسخة</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {(backups as any[]).map((backup: any) => (
+                <div key={backup.filename} className="flex items-center justify-between p-4 rounded-xl bg-black/20 border border-white/5 hover:border-white/10 transition-all">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                      <FileDown className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-white text-sm">{backup.filename}</p>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-xs text-slate-500 flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          {new Date(backup.createdAt).toLocaleString('ar-YE')}
+                        </span>
+                        <span className="text-xs text-slate-500">{formatSize(backup.size)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg text-blue-400 hover:bg-blue-500/10" onClick={() => downloadBackup(backup.filename)} data-testid={`download-backup-${backup.filename}`}>
+                      <Download className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg text-red-400 hover:bg-red-500/10" onClick={() => deleteBackup(backup.filename)} data-testid={`delete-backup-${backup.filename}`}>
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="bg-slate-900 border-red-500/20">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-xl flex items-center gap-3 text-red-400">
+            <ShieldAlert className="w-6 h-6" />
+            تصفير البيانات
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-slate-400 mb-6">تحذير: هذه العمليات لا يمكن التراجع عنها. يُنصح بإنشاء نسخة احتياطية قبل التصفير.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="p-4 rounded-xl bg-black/20 border border-white/5">
+              <div className="flex items-center gap-3 mb-3">
+                <Wallet className="w-5 h-5 text-yellow-400" />
+                <span className="font-medium text-white">تصفير الأرصدة</span>
+              </div>
+              <p className="text-xs text-slate-500 mb-4">تصفير رصيد جميع المستخدمين إلى صفر</p>
+              {resetConfirm === 'balances' ? (
+                <div className="flex gap-2">
+                  <Button size="sm" className="bg-red-600 hover:bg-red-700 flex-1" onClick={() => handleReset('balances')} disabled={isResetting} data-testid="confirm-reset-balances">
+                    {isResetting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'تأكيد'}
+                  </Button>
+                  <Button size="sm" variant="ghost" className="flex-1" onClick={() => setResetConfirm(null)}>إلغاء</Button>
+                </div>
+              ) : (
+                <Button size="sm" variant="outline" className="w-full border-red-500/30 text-red-400 hover:bg-red-500/10" onClick={() => setResetConfirm('balances')} data-testid="button-reset-balances">تصفير</Button>
+              )}
+            </div>
+
+            <div className="p-4 rounded-xl bg-black/20 border border-white/5">
+              <div className="flex items-center gap-3 mb-3">
+                <ShoppingBag className="w-5 h-5 text-blue-400" />
+                <span className="font-medium text-white">حذف الطلبات</span>
+              </div>
+              <p className="text-xs text-slate-500 mb-4">حذف جميع الطلبات من النظام</p>
+              {resetConfirm === 'orders' ? (
+                <div className="flex gap-2">
+                  <Button size="sm" className="bg-red-600 hover:bg-red-700 flex-1" onClick={() => handleReset('orders')} disabled={isResetting} data-testid="confirm-reset-orders">
+                    {isResetting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'تأكيد'}
+                  </Button>
+                  <Button size="sm" variant="ghost" className="flex-1" onClick={() => setResetConfirm(null)}>إلغاء</Button>
+                </div>
+              ) : (
+                <Button size="sm" variant="outline" className="w-full border-red-500/30 text-red-400 hover:bg-red-500/10" onClick={() => setResetConfirm('orders')} data-testid="button-reset-orders">حذف الكل</Button>
+              )}
+            </div>
+
+            <div className="p-4 rounded-xl bg-black/20 border border-white/5">
+              <div className="flex items-center gap-3 mb-3">
+                <DollarSign className="w-5 h-5 text-green-400" />
+                <span className="font-medium text-white">حذف الإيداعات</span>
+              </div>
+              <p className="text-xs text-slate-500 mb-4">حذف جميع طلبات الإيداع</p>
+              {resetConfirm === 'deposits' ? (
+                <div className="flex gap-2">
+                  <Button size="sm" className="bg-red-600 hover:bg-red-700 flex-1" onClick={() => handleReset('deposits')} disabled={isResetting} data-testid="confirm-reset-deposits">
+                    {isResetting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'تأكيد'}
+                  </Button>
+                  <Button size="sm" variant="ghost" className="flex-1" onClick={() => setResetConfirm(null)}>إلغاء</Button>
+                </div>
+              ) : (
+                <Button size="sm" variant="outline" className="w-full border-red-500/30 text-red-400 hover:bg-red-500/10" onClick={() => setResetConfirm('deposits')} data-testid="button-reset-deposits">حذف الكل</Button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 

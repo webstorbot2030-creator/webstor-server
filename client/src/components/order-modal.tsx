@@ -38,7 +38,7 @@ export function OrderModal({ serviceGroup, open, onOpenChange }: OrderModalProps
   const [payWithBalance, setPayWithBalance] = useState(false);
 
   const isAuthInput = serviceGroup?.inputType === 'auth';
-  const groupServices = services?.filter(s => s.serviceGroupId === serviceGroup?.id) || [];
+  const groupServices = services?.filter((s: any) => s.serviceGroupId === serviceGroup?.id) || [];
 
   const form = useForm<z.infer<typeof orderSchema>>({
     resolver: zodResolver(orderSchema),
@@ -75,7 +75,7 @@ export function OrderModal({ serviceGroup, open, onOpenChange }: OrderModalProps
           form.reset();
           
           if (settings?.adminWhatsapp) {
-            const message = `🛒 طلب جديد من ويب ستور\n══════════════════\n📦 القسم: ${serviceGroup.name}\n🎮 الخدمة: ${selectedService.name}\n🆔 المعرف: ${data.userInputId}\n💰 السعر: ${selectedService.price.toLocaleString()} ر.ي\n══════════════════\n👤 اسم العميل: ${user.fullName}\n${user.phoneNumber ? '📱 رقم الهاتف: ' + user.phoneNumber : '📧 البريد: ' + ((user as any).email || '')}\n${payWithBalance ? '✅ تم الدفع من الرصيد' : '⏳ بانتظار الدفع'}`;
+            const message = `🛒 طلب جديد من ويب ستور\n══════════════════\n📦 القسم: ${serviceGroup!.name}\n🎮 الخدمة: ${selectedService.name}\n🆔 المعرف: ${data.userInputId}\n💰 السعر: ${selectedService.price.toLocaleString()} ر.ي\n══════════════════\n👤 اسم العميل: ${user.fullName}\n${user.phoneNumber ? '📱 رقم الهاتف: ' + user.phoneNumber : '📧 البريد: ' + ((user as any).email || '')}\n${payWithBalance ? '✅ تم الدفع من الرصيد' : '⏳ بانتظار الدفع'}`;
             const whatsappUrl = `https://wa.me/${settings.adminWhatsapp.replace(/\+/g, '')}?text=${encodeURIComponent(message)}`;
             window.open(whatsappUrl, '_blank');
           }
@@ -99,7 +99,7 @@ export function OrderModal({ serviceGroup, open, onOpenChange }: OrderModalProps
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="glass bg-slate-900 border-white/10 text-white sm:max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="dark:bg-slate-900 bg-white dark:border-white/10 border-gray-200 dark:text-white text-gray-900 sm:max-w-md max-h-[90vh] overflow-y-auto backdrop-blur-sm">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-orange-500 text-center">
             {serviceGroup.name}
@@ -111,7 +111,7 @@ export function OrderModal({ serviceGroup, open, onOpenChange }: OrderModalProps
             <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mx-auto">
               <CheckCircle2 className="w-10 h-10 text-green-500" />
             </div>
-            <p className="text-gray-300">
+            <p className="dark:text-gray-300 text-gray-600">
               تم إرسال طلبك بنجاح وسيتم تنفيذه في أقرب وقت. يمكنك متابعة حالة الطلب من قائمة "طلباتي".
             </p>
             
@@ -122,7 +122,7 @@ export function OrderModal({ serviceGroup, open, onOpenChange }: OrderModalProps
                   const whatsappUrl = `https://wa.me/${settings.adminWhatsapp.replace(/\+/g, '')}?text=${encodeURIComponent(message)}`;
                   window.open(whatsappUrl, '_blank');
                 }} 
-                className="w-full bg-green-600 hover:bg-green-700 mt-2 gap-2"
+                className="w-full bg-green-600 hover:bg-green-700 mt-2 gap-2 text-white"
               >
                 <MessageSquare className="w-5 h-5" />
                 مراسلة المدير عبر واتساب
@@ -135,31 +135,29 @@ export function OrderModal({ serviceGroup, open, onOpenChange }: OrderModalProps
           </div>
         ) : (
           <div className="space-y-6 pt-4">
-            {/* Instruction */}
-            <div className="bg-slate-800/50 border border-blue-900/50 rounded-xl p-4 flex items-center justify-between">
-              <span className="text-gray-200 font-medium">
+            <div className="dark:bg-slate-800/50 bg-blue-50 border dark:border-blue-900/50 border-blue-200 rounded-xl p-4 flex items-center justify-between">
+              <span className="dark:text-gray-200 text-gray-700 font-medium">
                 {isAuthInput ? "الشحن عن طريق الحساب" : "الشحن عن طريق الآيدي"}
               </span>
-              <Info className="w-5 h-5 text-blue-400" />
+              <Info className="w-5 h-5 text-blue-500 dark:text-blue-400" />
             </div>
 
-            {/* Price Tiers List */}
             <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/10">
-              {groupServices.map((s) => (
+              {groupServices.map((s: any) => (
                 <div 
                   key={s.id}
                   onClick={() => setSelectedService(s)}
                   className={`relative p-4 rounded-xl cursor-pointer border-2 transition-all duration-200 ${
                     selectedService?.id === s.id 
-                      ? 'bg-slate-800 border-orange-500' 
-                      : 'bg-slate-800/30 border-white/5 hover:border-white/10'
+                      ? 'dark:bg-slate-800 bg-orange-50 border-orange-500' 
+                      : 'dark:bg-slate-800/30 bg-gray-50 dark:border-white/5 border-gray-200 dark:hover:border-white/10 hover:border-gray-300'
                   }`}
                 >
                   {selectedService?.id === s.id && (
                     <div className="absolute right-0 top-0 bottom-0 w-1 bg-orange-500 rounded-l-full" />
                   )}
                   <div className="flex justify-between items-center">
-                    <span className="font-bold text-white text-lg">{s.name}</span>
+                    <span className="font-bold dark:text-white text-gray-900 text-lg">{s.name}</span>
                     <span className="font-bold text-orange-500 text-lg">{s.price} ريال</span>
                   </div>
                 </div>
@@ -173,7 +171,7 @@ export function OrderModal({ serviceGroup, open, onOpenChange }: OrderModalProps
                   name="userInputId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-gray-300 font-bold">
+                      <FormLabel className="dark:text-gray-300 text-gray-700 font-bold">
                         {isAuthInput ? "البريد الإلكتروني وكلمة المرور" : "الآيدي أو الرقم"}
                       </FormLabel>
                       <FormControl>
@@ -181,13 +179,13 @@ export function OrderModal({ serviceGroup, open, onOpenChange }: OrderModalProps
                           <textarea
                             placeholder="أدخل تفاصيل الحساب هنا..."
                             {...field}
-                            className="w-full bg-slate-800 border border-white/10 rounded-xl text-white placeholder:text-gray-600 focus:border-orange-500 p-3 min-h-[80px] outline-none"
+                            className="w-full dark:bg-slate-800 bg-gray-50 border dark:border-white/10 border-gray-200 rounded-xl dark:text-white text-gray-900 dark:placeholder:text-gray-600 placeholder:text-gray-400 focus:border-orange-500 p-3 min-h-[80px] outline-none"
                           />
                         ) : (
                           <Input 
                             placeholder="أدخل الآيدي الخاص بك هنا" 
                             {...field} 
-                            className="bg-slate-800 border-white/10 text-white placeholder:text-gray-600 focus:border-orange-500 h-12"
+                            className="dark:bg-slate-800 bg-gray-50 dark:border-white/10 border-gray-200 dark:text-white text-gray-900 dark:placeholder:text-gray-600 placeholder:text-gray-400 focus:border-orange-500 h-12"
                           />
                         )}
                       </FormControl>
@@ -205,7 +203,7 @@ export function OrderModal({ serviceGroup, open, onOpenChange }: OrderModalProps
                       className="border-green-500 data-[state=checked]:bg-green-500"
                       data-testid="checkbox-pay-balance"
                     />
-                    <label htmlFor="payWithBalance" className="text-sm text-green-300 cursor-pointer flex items-center gap-2">
+                    <label htmlFor="payWithBalance" className="text-sm text-green-700 dark:text-green-300 cursor-pointer flex items-center gap-2">
                       <Wallet className="w-4 h-4" />
                       الدفع من الرصيد ({(user.balance || 0).toLocaleString()} ر.ي)
                     </label>
@@ -214,7 +212,7 @@ export function OrderModal({ serviceGroup, open, onOpenChange }: OrderModalProps
 
                 <Button 
                   type="submit" 
-                  className="w-full h-14 text-xl font-bold bg-orange-500 hover:bg-orange-600 transition-all rounded-xl shadow-lg shadow-orange-500/20 gap-2"
+                  className="w-full h-14 text-xl font-bold bg-orange-500 hover:bg-orange-600 transition-all rounded-xl shadow-lg shadow-orange-500/20 gap-2 text-white"
                   disabled={isPending || !selectedService}
                 >
                   {isPending ? (

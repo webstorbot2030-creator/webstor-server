@@ -65,7 +65,7 @@ export default function HomePage() {
               placeholder="ابحث عن لعبة أو خدمة..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-transparent border-gray-700 rounded-xl py-6 pr-12 pl-4 focus:border-primary focus:ring-primary/20 text-lg"
+              className="w-full bg-transparent dark:border-gray-700 border-gray-300 rounded-xl py-6 pr-12 pl-4 focus:border-primary focus:ring-primary/20 text-lg"
             />
           </div>
         </div>
@@ -103,7 +103,7 @@ export default function HomePage() {
         {servLoading || catLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3, 4, 5, 6].map(i => (
-              <div key={i} className="h-40 bg-white/5 rounded-2xl animate-pulse" />
+              <div key={i} className="h-40 dark:bg-white/5 bg-gray-200 rounded-2xl animate-pulse" />
             ))}
           </div>
         ) : (
@@ -123,7 +123,7 @@ export default function HomePage() {
                   </p>
                 </div>
 
-                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 flex items-center justify-center text-4xl shadow-inner group-hover:scale-110 transition-transform duration-300">
+                <div className="w-20 h-20 rounded-2xl dark:bg-gradient-to-br dark:from-white/10 dark:to-white/5 bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center text-4xl shadow-inner group-hover:scale-110 transition-transform duration-300">
                   {group.image?.startsWith('http') ? (
                     <img src={group.image} alt={group.name} className="w-full h-full object-cover rounded-2xl" />
                   ) : (
