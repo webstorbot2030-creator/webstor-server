@@ -7,11 +7,12 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Info, Loader2, CheckCircle2 } from "lucide-react";
+import { Info, Loader2, CheckCircle2, MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
+import { useSettings } from "@/hooks/use-store";
 
 const orderSchema = z.object({
   userInputId: z.string().min(1, "هذا الحقل مطلوب"),
@@ -29,6 +30,7 @@ export function OrderModal({ service, open, onOpenChange }: OrderModalProps) {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { data: settings } = useSettings();
 
   const form = useForm<z.infer<typeof orderSchema>>({
     resolver: zodResolver(orderSchema),
@@ -56,6 +58,13 @@ export function OrderModal({ service, open, onOpenChange }: OrderModalProps) {
         onSuccess: () => {
           setSuccess(true);
           form.reset();
+          
+          // Redirect to WhatsApp if setting exists
+          if (settings?.adminWhatsapp) {
+            const message = `طلب جديد من ويب ستور\n------------------\nالخدمة: ${service.name}\nالمعرف: ${data.userInputId}\nالسعر: ${service.price} ر.ي\nاسم العميل: ${user.fullName}\nرقم الهاتف: ${user.phoneNumber}`;
+            const whatsappUrl = `https://wa.me/${settings.adminWhatsapp.replace(/\+/g, '')}?text=${encodeURIComponent(message)}`;
+            window.open(whatsappUrl, '_blank');
+          }
         },
       }
     );
@@ -95,8 +104,23 @@ export function OrderModal({ service, open, onOpenChange }: OrderModalProps) {
             <p className="text-gray-300">
               تم إرسال طلبك بنجاح وسيتم تنفيذه في أقرب وقت. يمكنك متابعة حالة الطلب من قائمة "طلباتي".
             </p>
-            <Button onClick={() => handleOpenChange(false)} className="w-full bg-primary hover:bg-primary/90 mt-4">
-              حسناً
+            
+            {settings?.adminWhatsapp && (
+              <Button 
+                onClick={() => {
+                  const message = `تأكيد طلب من ويب ستور\n------------------\nالخدمة: ${service.name}\nالمعرف: ${form.getValues().userInputId || 'تم الإرسال مسبقاً'}\nالسعر: ${service.price} ر.ي\nاسم العميل: ${user?.fullName}\nرقم الهاتف: ${user?.phoneNumber}`;
+                  const whatsappUrl = `https://wa.me/${settings.adminWhatsapp.replace(/\+/g, '')}?text=${encodeURIComponent(message)}`;
+                  window.open(whatsappUrl, '_blank');
+                }} 
+                className="w-full bg-green-600 hover:bg-green-700 mt-2 gap-2"
+              >
+                <MessageSquare className="w-5 h-5" />
+                مراسلة المدير عبر واتساب
+              </Button>
+            )}
+
+            <Button onClick={() => handleOpenChange(false)} variant="outline" className="w-full mt-2">
+              إغلاق
             </Button>
           </div>
         ) : (
