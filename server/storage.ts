@@ -1,8 +1,9 @@
 import { db } from "./db";
 import {
-  users, categories, services, orders, banks, ads, settings,
+  users, categories, serviceGroups, services, orders, banks, ads, settings,
   type User, type InsertUser,
   type Category, type InsertCategory,
+  type ServiceGroup, type InsertServiceGroup,
   type Service, type InsertService,
   type Order, type InsertOrder,
   type Bank, type InsertBank,
@@ -29,8 +30,15 @@ export interface IStorage {
   createCategory(category: InsertCategory): Promise<Category>;
   deleteCategory(id: number): Promise<void>;
 
+  // Service Groups
+  getServiceGroups(): Promise<ServiceGroup[]>;
+  getServiceGroupsByCategory(categoryId: number): Promise<ServiceGroup[]>;
+  createServiceGroup(group: InsertServiceGroup): Promise<ServiceGroup>;
+  deleteServiceGroup(id: number): Promise<void>;
+
   // Services
-  getServices(): Promise<(Service & { category: Category })[]>;
+  getServices(): Promise<Service[]>;
+  getServicesByGroup(groupId: number): Promise<Service[]>;
   getService(id: number): Promise<Service | undefined>;
   createService(service: InsertService): Promise<Service>;
   deleteService(id: number): Promise<void>;
@@ -96,11 +104,31 @@ export class DatabaseStorage implements IStorage {
     await db.delete(categories).where(eq(categories.id, id));
   }
 
+  // Service Groups
+  async getServiceGroups(): Promise<ServiceGroup[]> {
+    return await db.select().from(serviceGroups);
+  }
+
+  async getServiceGroupsByCategory(categoryId: number): Promise<ServiceGroup[]> {
+    return await db.select().from(serviceGroups).where(eq(serviceGroups.categoryId, categoryId));
+  }
+
+  async createServiceGroup(group: InsertServiceGroup): Promise<ServiceGroup> {
+    const [created] = await db.insert(serviceGroups).values(group).returning();
+    return created;
+  }
+
+  async deleteServiceGroup(id: number): Promise<void> {
+    await db.delete(serviceGroups).where(eq(serviceGroups.id, id));
+  }
+
   // Services
-  async getServices(): Promise<(Service & { category: Category })[]> {
-    return await db.query.services.findMany({
-      with: { category: true },
-    });
+  async getServices(): Promise<Service[]> {
+    return await db.select().from(services);
+  }
+
+  async getServicesByGroup(groupId: number): Promise<Service[]> {
+    return await db.select().from(services).where(eq(services.serviceGroupId, groupId));
   }
 
   async getService(id: number): Promise<Service | undefined> {

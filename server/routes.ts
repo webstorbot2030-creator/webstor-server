@@ -139,12 +139,19 @@ async function seedDatabase() {
     const catGames = await storage.createCategory({ name: "ألعاب", icon: "gamepad-2" });
     const catCards = await storage.createCategory({ name: "بطاقات", icon: "credit-card" });
 
+    const pubgGroup = await storage.createServiceGroup({
+      name: "PUBG Mobile",
+      categoryId: catGames.id,
+      note: "يصلك خلال 5 دقائق",
+      image: "https://cdn-icons-png.flaticon.com/512/3050/3050525.png",
+      active: true,
+    });
+
     await storage.createService({
       name: "PUBG 60 UC",
       price: 5,
-      categoryId: catGames.id,
-      note: "يصلك خلال 5 دقائق",
-      image: "https://cdn-icons-png.flaticon.com/512/3050/3050525.png"
+      serviceGroupId: pubgGroup.id,
+      active: true,
     });
 
     await storage.createBank({
