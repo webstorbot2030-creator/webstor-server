@@ -40,6 +40,10 @@ export default function AdminPage() {
             <h1 className="text-xl font-bold text-white">لوحة الإدارة</h1>
           </div>
           <nav className="flex flex-col gap-2">
+            <Button onClick={() => setLocation("/accounting")} variant="ghost" className="justify-start gap-3 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded-xl h-12" data-testid="link-accounting">
+              <Wallet className="w-5 h-5" />
+              <span>النظام المحاسبي</span>
+            </Button>
             <Button onClick={() => setLocation("/")} variant="ghost" className="justify-start gap-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl h-12">
               <ExternalLink className="w-5 h-5" />
               <span>العودة للمتجر</span>
