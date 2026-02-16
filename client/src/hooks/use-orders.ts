@@ -35,7 +35,7 @@ export function useCreateOrder() {
   const { toast } = useToast();
   
   return useMutation({
-    mutationFn: async (data: CreateOrderRequest) => {
+    mutationFn: async (data: CreateOrderRequest & { payWithBalance?: boolean }) => {
       const res = await fetch(api.orders.create.path, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -51,7 +51,7 @@ export function useCreateOrder() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.orders.listMyOrders.path] });
-      // We don't toast here usually because the UI will show a success state/modal
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
     },
     onError: (error: Error) => {
       toast({

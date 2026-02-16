@@ -179,6 +179,17 @@ export function Navbar() {
                 </Link>
               )}
 
+              <Link href="/profile">
+                <Button 
+                  variant="ghost" 
+                  className="bg-white/5 hover:bg-white/10 hover:text-cyan-400 border border-white/5 rounded-xl gap-2 text-sm h-10 px-4"
+                  data-testid="button-profile"
+                >
+                  <UserIcon className="w-4 h-4 text-cyan-400" />
+                  <span className="hidden sm:inline">حسابي</span>
+                </Button>
+              </Link>
+
               <Button 
                 variant="ghost" 
                 className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-xl gap-2 text-sm h-10 px-4"

@@ -2,17 +2,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCreateOrder } from "@/hooks/use-orders";
-import { Service } from "@shared/schema";
+import { Service, ServiceGroup } from "@shared/schema";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Info, Loader2, CheckCircle2, MessageSquare } from "lucide-react";
+import { Info, Loader2, CheckCircle2, MessageSquare, Wallet } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useSettings, useServiceGroups, useServices } from "@/hooks/use-store";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const orderSchema = z.object({
   userInputId: z.string().min(1, "هذا الحقل مطلوب"),
@@ -34,6 +35,7 @@ export function OrderModal({ serviceGroup, open, onOpenChange }: OrderModalProps
   const { data: services } = useServices();
   
   const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [payWithBalance, setPayWithBalance] = useState(false);
 
   const isAuthInput = serviceGroup?.inputType === 'auth';
   const groupServices = services?.filter(s => s.serviceGroupId === serviceGroup?.id) || [];
@@ -66,7 +68,7 @@ export function OrderModal({ serviceGroup, open, onOpenChange }: OrderModalProps
     }
 
     createOrder(
-      { serviceId: selectedService.id, userInputId: data.userInputId },
+      { serviceId: selectedService.id, userInputId: data.userInputId, payWithBalance },
       {
         onSuccess: () => {
           setSuccess(true);
@@ -87,6 +89,7 @@ export function OrderModal({ serviceGroup, open, onOpenChange }: OrderModalProps
       setTimeout(() => {
         setSuccess(false);
         setSelectedService(null);
+        setPayWithBalance(false);
       }, 300);
     }
     onOpenChange(val);
@@ -192,6 +195,22 @@ export function OrderModal({ serviceGroup, open, onOpenChange }: OrderModalProps
                     </FormItem>
                   )}
                 />
+
+                {user && selectedService && (user.balance || 0) >= selectedService.price && (
+                  <div className="flex items-center gap-3 bg-green-500/10 border border-green-500/20 rounded-xl p-4">
+                    <Checkbox 
+                      id="payWithBalance" 
+                      checked={payWithBalance} 
+                      onCheckedChange={(v) => setPayWithBalance(v === true)}
+                      className="border-green-500 data-[state=checked]:bg-green-500"
+                      data-testid="checkbox-pay-balance"
+                    />
+                    <label htmlFor="payWithBalance" className="text-sm text-green-300 cursor-pointer flex items-center gap-2">
+                      <Wallet className="w-4 h-4" />
+                      الدفع من الرصيد ({(user.balance || 0).toLocaleString()} ر.ي)
+                    </label>
+                  </div>
+                )}
 
                 <Button 
                   type="submit" 

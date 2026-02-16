@@ -11,6 +11,7 @@ import AccountingPage from "@/pages/accounting-page";
 import ApiIntegrationPage from "@/pages/api-integration-page";
 import PrivacyPage from "@/pages/privacy-page";
 import TermsPage from "@/pages/terms-page";
+import ProfilePage from "@/pages/profile-page";
 
 function Router() {
   return (
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/api-integration" component={ApiIntegrationPage} />
       <Route path="/privacy" component={PrivacyPage} />
       <Route path="/terms" component={TermsPage} />
+      <Route path="/profile" component={ProfilePage} />
       <Route component={NotFound} />
     </Switch>
   );
