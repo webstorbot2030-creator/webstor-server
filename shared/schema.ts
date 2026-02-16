@@ -29,6 +29,7 @@ export const serviceGroups = pgTable("service_groups", {
   image: text("image"),
   note: text("note"),
   active: boolean("active").default(true),
+  inputType: text("input_type").default("id"), // 'id' or 'auth'
 });
 
 // "Prices/Packages" that belong to a service group
