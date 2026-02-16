@@ -2,7 +2,7 @@ import { db } from "./db";
 import {
   users, categories, serviceGroups, services, orders, banks, ads, settings,
   accounts, funds, accountingPeriods, journalEntries, journalLines, fundTransactions,
-  apiProviders, apiServiceMappings, apiOrderLogs, apiTokens,
+  apiProviders, apiServiceMappings, apiOrderLogs, apiTokens, notifications,
   type User, type InsertUser,
   type Category, type InsertCategory,
   type ServiceGroup, type InsertServiceGroup,
@@ -21,6 +21,7 @@ import {
   type ApiServiceMapping, type InsertApiServiceMapping,
   type ApiOrderLog, type InsertApiOrderLog,
   type ApiToken, type InsertApiToken,
+  type Notification, type InsertNotification,
 } from "@shared/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 
@@ -147,6 +148,20 @@ export interface IStorage {
   createApiToken(token: InsertApiToken): Promise<ApiToken>;
   updateApiToken(id: number, data: Partial<ApiToken>): Promise<ApiToken>;
   deleteApiToken(id: number): Promise<void>;
+
+  // Notifications
+  getNotifications(userId?: number): Promise<Notification[]>;
+  getUnreadNotificationCount(userId: number): Promise<number>;
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  markNotificationRead(id: number): Promise<Notification>;
+  markAllNotificationsRead(userId: number): Promise<void>;
+  deleteNotification(id: number): Promise<void>;
+
+  // Bulk API Service Mappings
+  createBulkApiServiceMappings(mappings: InsertApiServiceMapping[]): Promise<ApiServiceMapping[]>;
+
+  // Order Reports
+  getOrderReports(filters?: { status?: string; fromDate?: string; toDate?: string; userId?: number; serviceGroupId?: number }): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -590,6 +605,97 @@ export class DatabaseStorage implements IStorage {
 
   async deleteApiToken(id: number): Promise<void> {
     await db.delete(apiTokens).where(eq(apiTokens.id, id));
+  }
+
+  // === Notifications ===
+  async getNotifications(userId?: number): Promise<Notification[]> {
+    if (userId) {
+      return await db.select().from(notifications)
+        .where(eq(notifications.userId, userId))
+        .orderBy(desc(notifications.createdAt))
+        .limit(50);
+    }
+    return await db.select().from(notifications)
+      .orderBy(desc(notifications.createdAt))
+      .limit(100);
+  }
+
+  async getUnreadNotificationCount(userId: number): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(notifications)
+      .where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
+    return Number(result[0].count);
+  }
+
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    const [created] = await db.insert(notifications).values(notification).returning();
+    return created;
+  }
+
+  async markNotificationRead(id: number): Promise<Notification> {
+    const [updated] = await db.update(notifications).set({ isRead: true }).where(eq(notifications.id, id)).returning();
+    return updated;
+  }
+
+  async markAllNotificationsRead(userId: number): Promise<void> {
+    await db.update(notifications).set({ isRead: true }).where(eq(notifications.userId, userId));
+  }
+
+  async deleteNotification(id: number): Promise<void> {
+    await db.delete(notifications).where(eq(notifications.id, id));
+  }
+
+  // === Bulk API Service Mappings ===
+  async createBulkApiServiceMappings(mappings: InsertApiServiceMapping[]): Promise<ApiServiceMapping[]> {
+    if (mappings.length === 0) return [];
+    const created = await db.insert(apiServiceMappings).values(mappings).returning();
+    return created;
+  }
+
+  // === Order Reports ===
+  async getOrderReports(filters?: { status?: string; fromDate?: string; toDate?: string; userId?: number; serviceGroupId?: number }): Promise<any> {
+    const conditions = [];
+    if (filters?.status) conditions.push(sql`o.status = ${filters.status}`);
+    if (filters?.fromDate) conditions.push(sql`o.created_at >= ${filters.fromDate}::timestamp`);
+    if (filters?.toDate) conditions.push(sql`o.created_at <= ${filters.toDate}::timestamp + interval '1 day'`);
+    if (filters?.userId) conditions.push(sql`o.user_id = ${filters.userId}`);
+    if (filters?.serviceGroupId) conditions.push(sql`s.service_group_id = ${filters.serviceGroupId}`);
+
+    const whereClause = conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``;
+
+    const result = await db.execute(sql`
+      SELECT 
+        o.id, o.status, o.user_input_id, o.rejection_reason, o.created_at,
+        s.name as service_name, s.price as service_price, s.service_group_id,
+        sg.name as group_name,
+        u.full_name as user_name, u.phone_number as user_phone
+      FROM orders o
+      JOIN services s ON o.service_id = s.id
+      JOIN service_groups sg ON s.service_group_id = sg.id
+      JOIN users u ON o.user_id = u.id
+      ${whereClause}
+      ORDER BY o.created_at DESC
+      LIMIT 500
+    `);
+
+    const summary = await db.execute(sql`
+      SELECT 
+        COUNT(*)::text as total_orders,
+        COUNT(*) FILTER (WHERE o.status = 'completed')::text as completed_orders,
+        COUNT(*) FILTER (WHERE o.status = 'pending')::text as pending_orders,
+        COUNT(*) FILTER (WHERE o.status = 'processing')::text as processing_orders,
+        COUNT(*) FILTER (WHERE o.status = 'rejected')::text as rejected_orders,
+        COALESCE(SUM(s.price) FILTER (WHERE o.status = 'completed'), 0)::text as total_revenue,
+        COALESCE(SUM(s.price), 0)::text as total_value
+      FROM orders o
+      JOIN services s ON o.service_id = s.id
+      ${whereClause}
+    `);
+
+    return {
+      orders: result.rows,
+      summary: summary.rows[0],
+    };
   }
 
   // === Reports ===

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, Trash2, Plus, ArrowLeft, Network, Link2, ScrollText, Key, Wifi, WifiOff, RefreshCw, Copy, ChevronDown, ChevronUp, Pencil, Power, ShieldAlert, Wallet, ExternalLink } from "lucide-react";
+import { Loader2, Trash2, Plus, ArrowLeft, Network, Link2, ScrollText, Key, Wifi, WifiOff, RefreshCw, Copy, ChevronDown, ChevronUp, Pencil, Power, ShieldAlert, Wallet, ExternalLink, Layers } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { format } from "date-fns";
-import type { ApiProvider, ApiServiceMapping, ApiOrderLog, ApiToken, Service, User } from "@shared/schema";
+import type { ApiProvider, ApiServiceMapping, ApiOrderLog, ApiToken, Service, ServiceGroup, User } from "@shared/schema";
 
 export default function ApiIntegrationPage() {
   const { user, isLoading } = useAuth();
@@ -372,8 +372,14 @@ function MappingsManager() {
   const { data: mappings, isLoading } = useQuery<ApiServiceMapping[]>({ queryKey: ["/api/admin/api-mappings"] });
   const { data: providers } = useQuery<ApiProvider[]>({ queryKey: ["/api/admin/api-providers"] });
   const { data: services } = useQuery<Service[]>({ queryKey: ["/api/services"] });
+  const { data: serviceGroups } = useQuery<ServiceGroup[]>({ queryKey: ["/api/service-groups"] });
   const [showAdd, setShowAdd] = useState(false);
   const [editingMapping, setEditingMapping] = useState<ApiServiceMapping | null>(null);
+  const [showBulk, setShowBulk] = useState(false);
+  const [bulkProviderId, setBulkProviderId] = useState("");
+  const [bulkGroupId, setBulkGroupId] = useState("");
+  const [bulkAutoForward, setBulkAutoForward] = useState(false);
+  const [bulkServices, setBulkServices] = useState<{ serviceId: number; serviceName: string; checked: boolean; externalServiceId: string }[]>([]);
   const qc = useQueryClient();
   const { toast } = useToast();
 
@@ -446,12 +452,140 @@ function MappingsManager() {
     }
   };
 
+  const bulkMutation = useMutation({
+    mutationFn: async (mappings: { providerId: number; localServiceId: number; externalServiceId: string; autoForward: boolean; isActive: boolean }[]) => {
+      const res = await apiRequest("POST", "/api/admin/api-mappings/bulk", { mappings });
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/api-mappings"] });
+      setShowBulk(false);
+      setBulkProviderId("");
+      setBulkGroupId("");
+      setBulkAutoForward(false);
+      setBulkServices([]);
+      toast({ title: "تم إضافة الربط الجماعي بنجاح" });
+    },
+    onError: (e: any) => toast({ title: "خطأ", description: e.message, variant: "destructive" }),
+  });
+
+  const handleBulkGroupChange = (groupId: string) => {
+    setBulkGroupId(groupId);
+    const groupServices = (services || []).filter(s => s.serviceGroupId === Number(groupId));
+    setBulkServices(groupServices.map(s => ({ serviceId: s.id, serviceName: s.name, checked: true, externalServiceId: "" })));
+  };
+
+  const handleBulkSubmit = () => {
+    const selected = bulkServices.filter(s => s.checked && s.externalServiceId.trim());
+    if (!bulkProviderId || selected.length === 0) {
+      toast({ title: "خطأ", description: "يرجى اختيار المزود وإدخال معرفات الخدمات الخارجية", variant: "destructive" });
+      return;
+    }
+    bulkMutation.mutate(selected.map(s => ({
+      providerId: Number(bulkProviderId),
+      localServiceId: s.serviceId,
+      externalServiceId: s.externalServiceId,
+      autoForward: bulkAutoForward,
+      isActive: true,
+    })));
+  };
+
   if (isLoading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin w-8 h-8 text-primary" /></div>;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <h3 className="text-xl font-bold text-white">ربط الخدمات</h3>
+        <div className="flex flex-wrap gap-2">
+          <Dialog open={showBulk} onOpenChange={(open) => { if (!open) { setShowBulk(false); setBulkProviderId(""); setBulkGroupId(""); setBulkAutoForward(false); setBulkServices([]); } }}>
+            <DialogTrigger asChild>
+              <Button className="bg-violet-600 hover:bg-violet-700 rounded-xl gap-2" onClick={() => setShowBulk(true)} data-testid="button-bulk-mapping">
+                <Layers className="w-4 h-4" />
+                ربط دفعة واحدة
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-slate-900 border-white/10 max-w-2xl max-h-[90vh] overflow-y-auto" dir="rtl">
+              <DialogHeader>
+                <DialogTitle className="text-white" data-testid="text-bulk-dialog-title">ربط دفعة واحدة</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-slate-300 text-sm font-medium mb-1.5 block">المزود</label>
+                  <Select value={bulkProviderId} onValueChange={setBulkProviderId}>
+                    <SelectTrigger className="bg-slate-800 border-white/10" data-testid="select-bulk-provider">
+                      <SelectValue placeholder="اختر المزود" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(providers || []).map(p => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-slate-300 text-sm font-medium mb-1.5 block">مجموعة الخدمات</label>
+                  <Select value={bulkGroupId} onValueChange={handleBulkGroupChange}>
+                    <SelectTrigger className="bg-slate-800 border-white/10" data-testid="select-bulk-group">
+                      <SelectValue placeholder="اختر مجموعة الخدمات" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(serviceGroups || []).map(g => <SelectItem key={g.id} value={String(g.id)}>{g.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" checked={bulkAutoForward} onChange={(e) => setBulkAutoForward(e.target.checked)} className="rounded" data-testid="checkbox-bulk-autoforward" />
+                  <label className="text-slate-300 text-sm">تحويل تلقائي للجميع</label>
+                </div>
+                {bulkServices.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-slate-300 text-sm font-medium">الخدمات في المجموعة</label>
+                      <Badge variant="outline" className="text-xs text-violet-400 border-violet-500/20" data-testid="badge-bulk-count">
+                        {bulkServices.filter(s => s.checked).length} / {bulkServices.length}
+                      </Badge>
+                    </div>
+                    <div className="space-y-2 max-h-60 overflow-y-auto rounded-lg border border-white/5 p-3 bg-slate-800/50">
+                      {bulkServices.map((s, idx) => (
+                        <div key={s.serviceId} className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-colors" data-testid={`bulk-service-row-${s.serviceId}`}>
+                          <input
+                            type="checkbox"
+                            checked={s.checked}
+                            onChange={(e) => {
+                              const updated = [...bulkServices];
+                              updated[idx] = { ...updated[idx], checked: e.target.checked };
+                              setBulkServices(updated);
+                            }}
+                            className="rounded"
+                            data-testid={`checkbox-bulk-service-${s.serviceId}`}
+                          />
+                          <span className="text-white text-sm min-w-[120px]">{s.serviceName}</span>
+                          <Input
+                            placeholder="معرف الخدمة الخارجية"
+                            value={s.externalServiceId}
+                            onChange={(e) => {
+                              const updated = [...bulkServices];
+                              updated[idx] = { ...updated[idx], externalServiceId: e.target.value };
+                              setBulkServices(updated);
+                            }}
+                            className="bg-slate-800 border-white/10 flex-1"
+                            disabled={!s.checked}
+                            data-testid={`input-bulk-external-id-${s.serviceId}`}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <Button
+                  onClick={handleBulkSubmit}
+                  disabled={bulkMutation.isPending || !bulkProviderId || bulkServices.filter(s => s.checked && s.externalServiceId.trim()).length === 0}
+                  className="w-full bg-violet-600 hover:bg-violet-700 rounded-xl"
+                  data-testid="button-submit-bulk-mapping"
+                >
+                  {bulkMutation.isPending ? <Loader2 className="animate-spin w-4 h-4" /> : `إضافة ${bulkServices.filter(s => s.checked && s.externalServiceId.trim()).length} ربط`}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         <Dialog open={showAdd || !!editingMapping} onOpenChange={(open) => { if (!open) { setShowAdd(false); setEditingMapping(null); } }}>
           <DialogTrigger asChild>
             <Button className="bg-violet-600 hover:bg-violet-700 rounded-xl gap-2" onClick={openAdd} data-testid="button-add-mapping">
@@ -529,6 +663,7 @@ function MappingsManager() {
             </Form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {(mappings || []).length === 0 ? (

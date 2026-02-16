@@ -107,6 +107,24 @@ export async function registerRoutes(
       userId: req.user.id,
       status: "pending"
     });
+
+    try {
+      const service = await storage.getService(orderData.serviceId);
+      const allUsers = await storage.getAllUsers();
+      const admins = allUsers.filter(u => u.role === "admin");
+      for (const admin of admins) {
+        await storage.createNotification({
+          userId: admin.id,
+          type: "order",
+          title: "طلب جديد",
+          message: `طلب جديد #${order.id} من ${req.user.fullName} - ${service?.name || 'خدمة'}`,
+          relatedOrderId: order.id,
+        });
+      }
+    } catch (e) {
+      console.error("Failed to notify admins:", e);
+    }
+
     res.status(201).json(order);
   });
 
@@ -127,6 +145,28 @@ export async function registerRoutes(
     if (req.user?.role !== "admin") return res.sendStatus(403);
     const { status, rejectionReason } = req.body;
     const order = await storage.updateOrderStatus(Number(req.params.id), status, rejectionReason);
+
+    try {
+      const service = await storage.getService(order.serviceId);
+      const serviceName = service?.name || `#${order.serviceId}`;
+      const statusMessages: Record<string, { title: string; message: string; type: string }> = {
+        processing: { title: "جاري تنفيذ طلبك", message: `طلبك رقم #${order.id} (${serviceName}) قيد التنفيذ الآن`, type: "info" },
+        completed: { title: "تم تنفيذ طلبك بنجاح", message: `طلبك رقم #${order.id} (${serviceName}) تم تنفيذه بنجاح`, type: "success" },
+        rejected: { title: "تم رفض طلبك", message: `طلبك رقم #${order.id} (${serviceName}) تم رفضه${rejectionReason ? ': ' + rejectionReason : ''}`, type: "error" },
+      };
+      const msg = statusMessages[status];
+      if (msg) {
+        await storage.createNotification({
+          userId: order.userId,
+          type: msg.type,
+          title: msg.title,
+          message: msg.message,
+          relatedOrderId: order.id,
+        });
+      }
+    } catch (e) {
+      console.error("Failed to create notification:", e);
+    }
 
     if (status === "processing") {
       try {
@@ -460,6 +500,99 @@ export async function registerRoutes(
     if (req.user?.role !== "admin") return res.sendStatus(403);
     await storage.deleteApiToken(Number(req.params.id));
     res.sendStatus(204);
+  });
+
+  // === Bulk API Service Mappings ===
+  app.post("/api/admin/api-mappings/bulk", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    try {
+      const { providerId, serviceGroupId, mappings: mappingList, externalPrefix } = req.body;
+      
+      if (mappingList && Array.isArray(mappingList)) {
+        const created = await storage.createBulkApiServiceMappings(mappingList.map((m: any) => ({
+          providerId: Number(m.providerId),
+          localServiceId: Number(m.localServiceId),
+          externalServiceId: m.externalServiceId,
+          externalServiceName: m.externalServiceName || null,
+          externalPrice: m.externalPrice || null,
+          isActive: m.isActive !== false,
+          autoForward: m.autoForward || false,
+        })));
+        return res.status(201).json({ created: created.length, mappings: created });
+      }
+
+      if (providerId && serviceGroupId) {
+        const groupServices = await storage.getServicesByGroup(Number(serviceGroupId));
+        const bulkMappings = groupServices
+          .filter(s => s.active !== false)
+          .map(s => ({
+            providerId: Number(providerId),
+            localServiceId: s.id,
+            externalServiceId: externalPrefix ? `${externalPrefix}${s.id}` : String(s.id),
+            externalServiceName: s.name,
+            externalPrice: null as string | null,
+            isActive: true,
+            autoForward: false,
+          }));
+        const created = await storage.createBulkApiServiceMappings(bulkMappings);
+        return res.status(201).json({ created: created.length, mappings: created });
+      }
+
+      return res.status(400).json({ message: "Provide mappings array or providerId+serviceGroupId" });
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  // === Notifications ===
+  app.get("/api/notifications", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    const notifs = await storage.getNotifications(req.user.id);
+    res.json(notifs);
+  });
+
+  app.get("/api/notifications/unread-count", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    const count = await storage.getUnreadNotificationCount(req.user.id);
+    res.json({ count });
+  });
+
+  app.get("/api/admin/notifications", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const notifs = await storage.getNotifications();
+    res.json(notifs);
+  });
+
+  app.post("/api/notifications/:id/read", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    const notif = await storage.markNotificationRead(Number(req.params.id));
+    res.json(notif);
+  });
+
+  app.post("/api/notifications/read-all", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    await storage.markAllNotificationsRead(req.user.id);
+    res.json({ success: true });
+  });
+
+  app.delete("/api/notifications/:id", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    await storage.deleteNotification(Number(req.params.id));
+    res.sendStatus(204);
+  });
+
+  // === Order Reports ===
+  app.get("/api/admin/reports/orders", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const filters = {
+      status: req.query.status as string | undefined,
+      fromDate: req.query.fromDate as string | undefined,
+      toDate: req.query.toDate as string | undefined,
+      userId: req.query.userId ? Number(req.query.userId) : undefined,
+      serviceGroupId: req.query.serviceGroupId ? Number(req.query.serviceGroupId) : undefined,
+    };
+    const report = await storage.getOrderReports(filters);
+    res.json(report);
   });
 
   // === Accounting: Accounts (Chart of Accounts) ===
