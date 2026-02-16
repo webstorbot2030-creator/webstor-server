@@ -8,8 +8,8 @@ import { z } from "zod";
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   fullName: text("full_name").notNull(),
-  phoneNumber: text("phone_number").notNull().unique(),
-  email: text("email"),
+  phoneNumber: text("phone_number").unique(),
+  email: text("email").unique(),
   password: text("password").notNull(),
   role: text("role").notNull().default("user"),
   balance: integer("balance").default(0),
@@ -420,6 +420,6 @@ export type AdminActivityLog = typeof adminActivityLogs.$inferSelect;
 export type InsertAdminActivityLog = z.infer<typeof insertAdminActivityLogSchema>;
 
 // Request types
-export type LoginRequest = { phoneNumber: string; password: string };
+export type LoginRequest = { identifier: string; password: string };
 export type CreateOrderRequest = { serviceId: number; userInputId: string };
 export type UpdateOrderRequest = { status: string; rejectionReason?: string };
