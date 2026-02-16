@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useAllOrders, useUpdateOrderStatus } from "@/hooks/use-orders";
 import { useCategories, useCreateCategory, useDeleteCategory, useServices, useCreateService, useDeleteService, useAds, useCreateAd, useDeleteAd, useBanks, useCreateBank, useDeleteBank, useSettings, useUpdateSettings, useServiceGroups, useCreateServiceGroup, useDeleteServiceGroup, useAdminUsers, useUpdateUser, useUpdateServiceGroup, useUpdateService } from "@/hooks/use-store";
-import { Loader2, Trash2, Plus, Check, X, LayoutDashboard, ShoppingBag, Package, ListTree, Megaphone, Landmark, Settings, ExternalLink, ShieldAlert, Users, Power, Image, Link, Eye, EyeOff, UserCog, Wallet, BarChart3, Download, Filter, TrendingUp, Clock, UserPlus, DollarSign, Activity, KeyRound, Lock, Mail, MessageCircle } from "lucide-react";
+import { Loader2, Trash2, Plus, Check, X, LayoutDashboard, ShoppingBag, Package, ListTree, Megaphone, Landmark, Settings, ExternalLink, ShieldAlert, Users, Power, Image, Link, Eye, EyeOff, UserCog, Wallet, BarChart3, Download, Filter, TrendingUp, Clock, UserPlus, DollarSign, Activity, KeyRound, Lock, Mail, MessageCircle, Crown, Upload, ImageIcon, Wrench } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -97,6 +98,14 @@ export default function AdminPage() {
                     <Settings className="w-4 h-4" />
                     <span>الإعدادات</span>
                   </TabsTrigger>
+                  <TabsTrigger value="deposits" className="data-[state=active]:bg-primary data-[state=active]:text-white px-4 py-2 rounded-xl transition-all flex gap-2 items-center text-xs">
+                    <Wallet className="w-4 h-4" />
+                    <span>طلبات التغذية</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="vip" className="data-[state=active]:bg-primary data-[state=active]:text-white px-4 py-2 rounded-xl transition-all flex gap-2 items-center text-xs">
+                    <Crown className="w-4 h-4" />
+                    <span>مجموعات VIP</span>
+                  </TabsTrigger>
                   <TabsTrigger value="reports" className="data-[state=active]:bg-primary data-[state=active]:text-white px-4 py-2 rounded-xl transition-all flex gap-2 items-center text-xs">
                     <BarChart3 className="w-4 h-4" />
                     <span>التقارير</span>
@@ -132,6 +141,12 @@ export default function AdminPage() {
               </TabsContent>
               <TabsContent value="settings" className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
                 <StoreSettingsManager />
+              </TabsContent>
+              <TabsContent value="deposits" className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+                <DepositRequestsManager />
+              </TabsContent>
+              <TabsContent value="vip" className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+                <VipGroupsManager />
               </TabsContent>
               <TabsContent value="reports" className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
                 <OrderReportsManager />
@@ -241,6 +256,412 @@ function OrdersManager() {
   );
 }
 
+function DepositRequestsManager() {
+  const [filter, setFilter] = useState('all');
+  const [selectedRequest, setSelectedRequest] = useState<any>(null);
+  const [approvedAmount, setApprovedAmount] = useState("");
+  const [selectedFundId, setSelectedFundId] = useState("");
+  const [notes, setNotes] = useState("");
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [rejectingId, setRejectingId] = useState<number | null>(null);
+  const [viewImage, setViewImage] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const { data: deposits, isLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/deposit-requests"],
+  });
+
+  const { data: funds } = useQuery<any[]>({
+    queryKey: ["/api/accounting/funds"],
+  });
+
+  const filteredDeposits = useMemo(() => {
+    if (!deposits) return [];
+    if (filter === 'all') return deposits;
+    return deposits.filter((d: any) => d.status === filter);
+  }, [deposits, filter]);
+
+  const handleApprove = async (id: number) => {
+    try {
+      await apiRequest("PATCH", `/api/admin/deposit-requests/${id}`, {
+        status: "approved",
+        approvedAmount: Number(approvedAmount),
+        fundId: selectedFundId ? Number(selectedFundId) : undefined,
+        notes,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/deposit-requests"] });
+      toast({ title: "تم قبول طلب التغذية بنجاح" });
+      setSelectedRequest(null);
+      setApprovedAmount("");
+      setSelectedFundId("");
+      setNotes("");
+    } catch (e: any) {
+      toast({ title: e.message || "خطأ", variant: "destructive" });
+    }
+  };
+
+  const handleReject = async (id: number) => {
+    try {
+      await apiRequest("PATCH", `/api/admin/deposit-requests/${id}`, {
+        status: "rejected",
+        rejectionReason,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/deposit-requests"] });
+      toast({ title: "تم رفض الطلب" });
+      setRejectingId(null);
+      setRejectionReason("");
+    } catch (e: any) {
+      toast({ title: e.message || "خطأ", variant: "destructive" });
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+        {[
+          { id: 'all', label: 'الكل' },
+          { id: 'pending', label: 'قيد الانتظار' },
+          { id: 'approved', label: 'مقبول' },
+          { id: 'rejected', label: 'مرفوض' }
+        ].map(s => (
+          <Button key={s.id} variant={filter === s.id ? 'default' : 'outline'} onClick={() => setFilter(s.id)}
+            className={`rounded-xl px-6 h-11 transition-all ${filter === s.id ? 'bg-primary border-primary shadow-lg shadow-primary/20' : 'bg-slate-900 border-white/5 text-slate-400 hover:text-white hover:bg-white/5'}`}
+            data-testid={`button-deposit-filter-${s.id}`}
+          >{s.label}</Button>
+        ))}
+      </div>
+      <div className="grid gap-4">
+        {isLoading ? (
+          <div className="flex justify-center py-20"><Loader2 className="animate-spin w-8 h-8 text-primary" /></div>
+        ) : filteredDeposits.length === 0 ? (
+          <Card className="bg-slate-900 border-dashed border-white/10 text-center py-20">
+            <Wallet className="w-12 h-12 text-slate-700 mx-auto mb-4" />
+            <p className="text-slate-500">لا توجد طلبات تغذية في هذا القسم</p>
+          </Card>
+        ) : filteredDeposits.map((req: any) => (
+          <Card key={req.id} className="bg-slate-900 border-white/5 overflow-hidden transition-all hover:border-primary/30" data-testid={`card-deposit-${req.id}`}>
+            <CardContent className="p-0">
+              <div className="p-5 flex flex-col md:flex-row justify-between gap-6 items-start md:items-center">
+                <div className="flex gap-4 items-start">
+                  {req.receiptImageUrl && (
+                    <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center overflow-hidden border border-white/5 cursor-pointer" onClick={() => setViewImage(req.receiptImageUrl)} data-testid={`button-view-receipt-${req.id}`}>
+                      <img src={req.receiptImageUrl} alt="إيصال" className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-3">
+                      <h3 className="font-bold text-lg text-white">{req.user?.fullName || 'مستخدم'}</h3>
+                      <span className="text-[10px] font-mono bg-white/5 text-slate-500 px-2 py-0.5 rounded-full">#{req.id}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-400">
+                      <span className="font-bold text-teal-400">{Number(req.amount || 0).toLocaleString()} ر.ي</span>
+                      {req.createdAt && <span>{format(new Date(req.createdAt), "yyyy/MM/dd HH:mm")}</span>}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-3 w-full md:w-auto">
+                  <div className={`px-4 py-1.5 rounded-full text-xs font-bold border ${req.status === 'pending' ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500' : req.status === 'approved' ? 'bg-green-500/10 border-green-500/20 text-green-500' : 'bg-red-500/10 border-red-500/20 text-red-500'}`}>
+                    {req.status === 'pending' ? 'قيد الانتظار' : req.status === 'approved' ? 'مقبول' : 'مرفوض'}
+                  </div>
+                  {req.status === 'pending' && (
+                    <div className="flex gap-2">
+                      <Dialog open={selectedRequest === req.id} onOpenChange={open => { if (!open) setSelectedRequest(null); }}>
+                        <DialogTrigger asChild>
+                          <Button size="sm" className="bg-green-600 hover:bg-green-700 h-9 px-4 rounded-xl" onClick={() => { setSelectedRequest(req.id); setApprovedAmount(String(req.amount || 0)); }} data-testid={`button-approve-deposit-${req.id}`}>
+                            <Check className="w-4 h-4 ml-1" /> قبول
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="bg-slate-900 border-white/10 text-white">
+                          <DialogHeader><DialogTitle>قبول طلب التغذية</DialogTitle></DialogHeader>
+                          <div className="space-y-4 py-4">
+                            <div className="space-y-2">
+                              <label className="text-sm text-slate-400">المبلغ المعتمد</label>
+                              <Input value={approvedAmount} onChange={e => setApprovedAmount(e.target.value)} type="number" className="bg-black/20 border-white/10 h-12 text-center text-xl font-mono" data-testid="input-approved-amount" />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-sm text-slate-400">الصندوق</label>
+                              <select value={selectedFundId} onChange={e => setSelectedFundId(e.target.value)} className="w-full bg-black/20 border border-white/10 rounded-xl h-11 px-3 text-sm focus:border-primary outline-none" data-testid="select-deposit-fund">
+                                <option value="" className="bg-slate-900">اختر الصندوق</option>
+                                {funds?.map((f: any) => <option key={f.id} value={f.id} className="bg-slate-900">{f.name}</option>)}
+                              </select>
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-sm text-slate-400">ملاحظات (اختياري)</label>
+                              <textarea value={notes} onChange={e => setNotes(e.target.value)} className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-sm focus:border-primary outline-none min-h-[80px] resize-none" data-testid="input-deposit-notes" />
+                            </div>
+                            <Button className="w-full bg-green-600 hover:bg-green-700 h-12 rounded-xl" onClick={() => handleApprove(req.id)} data-testid="button-confirm-approve">تأكيد القبول</Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+
+                      <Dialog open={rejectingId === req.id} onOpenChange={open => { if (!open) setRejectingId(null); }}>
+                        <DialogTrigger asChild>
+                          <Button size="sm" variant="destructive" className="h-9 px-4 rounded-xl" onClick={() => setRejectingId(req.id)} data-testid={`button-reject-deposit-${req.id}`}>
+                            <X className="w-4 h-4 ml-1" /> رفض
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="bg-slate-900 border-white/10 text-white">
+                          <DialogHeader><DialogTitle>سبب الرفض</DialogTitle></DialogHeader>
+                          <div className="space-y-4 py-4">
+                            <Input value={rejectionReason} onChange={e => setRejectionReason(e.target.value)} placeholder="اكتب سبب الرفض هنا..." className="bg-black/20 border-white/10 h-12" data-testid="input-rejection-reason" />
+                            <Button className="w-full bg-red-600 hover:bg-red-700 h-12 rounded-xl" onClick={() => handleReject(req.id)} data-testid="button-confirm-reject">تأكيد الرفض</Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <Dialog open={!!viewImage} onOpenChange={open => { if (!open) setViewImage(null); }}>
+        <DialogContent className="bg-slate-900 border-white/10 text-white max-w-2xl">
+          <DialogHeader><DialogTitle>صورة الإيصال</DialogTitle></DialogHeader>
+          {viewImage && <img src={viewImage} alt="إيصال" className="w-full rounded-xl" />}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function VipGroupsManager() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupDiscount, setNewGroupDiscount] = useState("");
+  const [editingGroup, setEditingGroup] = useState<any>(null);
+  const [editDiscount, setEditDiscount] = useState("");
+  const [expandedGroup, setExpandedGroup] = useState<number | null>(null);
+  const [newDiscountServiceId, setNewDiscountServiceId] = useState("");
+  const [newDiscountPercent, setNewDiscountPercent] = useState("");
+
+  const { data: vipGroups, isLoading } = useQuery<any[]>({
+    queryKey: ["/api/vip-groups"],
+  });
+
+  const { data: services } = useServices();
+
+  const handleCreateGroup = async () => {
+    try {
+      await apiRequest("POST", "/api/vip-groups", {
+        name: newGroupName,
+        globalDiscount: Number(newGroupDiscount),
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/vip-groups"] });
+      toast({ title: "تم إضافة مجموعة VIP بنجاح" });
+      setShowAddDialog(false);
+      setNewGroupName("");
+      setNewGroupDiscount("");
+    } catch (e: any) {
+      toast({ title: e.message || "خطأ", variant: "destructive" });
+    }
+  };
+
+  const handleUpdateGroup = async (id: number) => {
+    try {
+      await apiRequest("PATCH", `/api/vip-groups/${id}`, {
+        globalDiscount: Number(editDiscount),
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/vip-groups"] });
+      toast({ title: "تم التحديث" });
+      setEditingGroup(null);
+      setEditDiscount("");
+    } catch (e: any) {
+      toast({ title: e.message || "خطأ", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteGroup = async (id: number) => {
+    try {
+      await apiRequest("DELETE", `/api/vip-groups/${id}`);
+      queryClient.invalidateQueries({ queryKey: ["/api/vip-groups"] });
+      toast({ title: "تم حذف المجموعة" });
+    } catch (e: any) {
+      toast({ title: e.message || "خطأ", variant: "destructive" });
+    }
+  };
+
+  const handleAddDiscount = async (groupId: number) => {
+    try {
+      await apiRequest("POST", `/api/vip-groups/${groupId}/discounts`, {
+        serviceId: Number(newDiscountServiceId),
+        discountPercent: Number(newDiscountPercent),
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/vip-groups"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vip-groups", groupId, "discounts"] });
+      toast({ title: "تم إضافة الخصم" });
+      setNewDiscountServiceId("");
+      setNewDiscountPercent("");
+    } catch (e: any) {
+      toast({ title: e.message || "خطأ", variant: "destructive" });
+    }
+  };
+
+  const handleRemoveDiscount = async (discountId: number, groupId: number) => {
+    try {
+      await apiRequest("DELETE", `/api/vip-discounts/${discountId}`);
+      queryClient.invalidateQueries({ queryKey: ["/api/vip-groups"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vip-groups", groupId, "discounts"] });
+      toast({ title: "تم حذف الخصم" });
+    } catch (e: any) {
+      toast({ title: e.message || "خطأ", variant: "destructive" });
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h3 className="text-xl font-bold text-white">مجموعات VIP</h3>
+        <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+          <DialogTrigger asChild>
+            <Button className="bg-primary hover:bg-primary/90 rounded-xl shadow-lg shadow-primary/20 gap-2" data-testid="button-add-vip-group">
+              <Plus className="w-4 h-4" /> إضافة مجموعة VIP
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="bg-slate-900 border-white/10 text-white">
+            <DialogHeader><DialogTitle>إضافة مجموعة VIP جديدة</DialogTitle></DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label className="text-sm text-slate-400">اسم المجموعة</label>
+                <Input value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="مثلاً: VIP1" className="bg-black/20 border-white/10 h-12" data-testid="input-vip-group-name" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm text-slate-400">نسبة الخصم العام (%)</label>
+                <Input value={newGroupDiscount} onChange={e => setNewGroupDiscount(e.target.value)} type="number" placeholder="10" className="bg-black/20 border-white/10 h-12" data-testid="input-vip-global-discount" />
+              </div>
+              <Button className="w-full bg-primary hover:bg-primary/90 h-12 rounded-xl" onClick={handleCreateGroup} data-testid="button-confirm-add-vip">إضافة</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-20"><Loader2 className="animate-spin w-8 h-8 text-primary" /></div>
+      ) : !vipGroups?.length ? (
+        <Card className="bg-slate-900 border-dashed border-white/10 text-center py-20">
+          <Crown className="w-12 h-12 text-slate-700 mx-auto mb-4" />
+          <p className="text-slate-500">لا توجد مجموعات VIP حالياً</p>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {vipGroups.map((group: any) => (
+            <VipGroupCard
+              key={group.id}
+              group={group}
+              services={services}
+              expanded={expandedGroup === group.id}
+              onToggleExpand={() => setExpandedGroup(expandedGroup === group.id ? null : group.id)}
+              editingGroup={editingGroup}
+              editDiscount={editDiscount}
+              setEditingGroup={setEditingGroup}
+              setEditDiscount={setEditDiscount}
+              onUpdate={handleUpdateGroup}
+              onDelete={handleDeleteGroup}
+              newDiscountServiceId={newDiscountServiceId}
+              newDiscountPercent={newDiscountPercent}
+              setNewDiscountServiceId={setNewDiscountServiceId}
+              setNewDiscountPercent={setNewDiscountPercent}
+              onAddDiscount={handleAddDiscount}
+              onRemoveDiscount={handleRemoveDiscount}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VipGroupCard({ group, services, expanded, onToggleExpand, editingGroup, editDiscount, setEditingGroup, setEditDiscount, onUpdate, onDelete, newDiscountServiceId, newDiscountPercent, setNewDiscountServiceId, setNewDiscountPercent, onAddDiscount, onRemoveDiscount }: any) {
+  const { data: discounts } = useQuery<any[]>({
+    queryKey: ["/api/vip-groups", group.id, "discounts"],
+    queryFn: async () => {
+      const res = await fetch(`/api/vip-groups/${group.id}/discounts`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch discounts");
+      return res.json();
+    },
+    enabled: expanded,
+  });
+
+  return (
+    <Card className="bg-slate-900 border-white/5 overflow-hidden transition-all hover:border-primary/20" data-testid={`card-vip-group-${group.id}`}>
+      <div className="p-4 flex items-center justify-between border-b border-white/5">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center border border-yellow-500/20">
+            <Crown className="w-5 h-5 text-yellow-400" />
+          </div>
+          <div>
+            <h4 className="font-bold text-white">{group.name}</h4>
+            <span className="text-xs text-slate-400">خصم عام: {group.globalDiscount || 0}%</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${group.active !== false ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+            {group.active !== false ? 'نشط' : 'معطل'}
+          </div>
+          <Dialog open={editingGroup === group.id} onOpenChange={open => { if (!open) setEditingGroup(null); }}>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-blue-400 hover:bg-blue-500/10" onClick={() => { setEditingGroup(group.id); setEditDiscount(String(group.globalDiscount || 0)); }} data-testid={`button-edit-vip-${group.id}`}>
+                <Wrench className="w-4 h-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-slate-900 border-white/10 text-white">
+              <DialogHeader><DialogTitle>تعديل مجموعة {group.name}</DialogTitle></DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <label className="text-sm text-slate-400">نسبة الخصم العام (%)</label>
+                  <Input value={editDiscount} onChange={e => setEditDiscount(e.target.value)} type="number" className="bg-black/20 border-white/10 h-12" data-testid="input-edit-vip-discount" />
+                </div>
+                <Button className="w-full bg-primary hover:bg-primary/90 h-12 rounded-xl" onClick={() => onUpdate(group.id)} data-testid="button-confirm-edit-vip">حفظ</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+          <Button variant="ghost" size="icon" className="text-red-400 hover:bg-red-500/10 h-8 w-8 rounded-lg" onClick={() => onDelete(group.id)} data-testid={`button-delete-vip-${group.id}`}>
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+      <div className="p-3 bg-black/10">
+        <button onClick={onToggleExpand} className="w-full text-xs text-slate-400 hover:text-white transition-colors py-1" data-testid={`button-toggle-discounts-${group.id}`}>
+          {expanded ? 'إخفاء خصومات الخدمات ▲' : 'عرض خصومات الخدمات ▼'}
+        </button>
+        {expanded && (
+          <div className="mt-3 space-y-3">
+            <div className="flex gap-2">
+              <select value={newDiscountServiceId} onChange={e => setNewDiscountServiceId(e.target.value)} className="flex-1 bg-black/20 border border-white/10 rounded-lg h-9 px-2 text-xs outline-none" data-testid={`select-discount-service-${group.id}`}>
+                <option value="" className="bg-slate-900">اختر الخدمة</option>
+                {services?.map((s: any) => <option key={s.id} value={s.id} className="bg-slate-900">{s.name}</option>)}
+              </select>
+              <Input value={newDiscountPercent} onChange={e => setNewDiscountPercent(e.target.value)} type="number" placeholder="%" className="w-20 bg-black/20 border-white/10 h-9 text-xs" data-testid={`input-discount-percent-${group.id}`} />
+              <Button size="sm" className="bg-teal-600 hover:bg-teal-700 h-9 px-3 rounded-lg" onClick={() => onAddDiscount(group.id)} data-testid={`button-add-discount-${group.id}`}>
+                <Plus className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+            {discounts?.map((d: any) => (
+              <div key={d.id} className="flex justify-between items-center text-sm px-2 py-1.5 rounded-lg hover:bg-white/5 transition-colors">
+                <span className="text-slate-300 text-xs">{d.service?.name || `خدمة #${d.serviceId}`}</span>
+                <div className="flex items-center gap-3">
+                  <span className="font-bold text-teal-400 text-xs">{d.discountPercent}%</span>
+                  <button className="text-red-500/50 hover:text-red-500 transition-colors" onClick={() => onRemoveDiscount(d.id, group.id)} data-testid={`button-remove-discount-${d.id}`}>
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+            {discounts?.length === 0 && (
+              <p className="text-xs text-slate-600 text-center py-2">لا توجد خصومات مخصصة</p>
+            )}
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 function UsersManager() {
   const { data: users, isLoading } = useAdminUsers();
   const { mutate: updateUser } = useUpdateUser();
@@ -250,6 +671,7 @@ function UsersManager() {
   const [newPassword, setNewPassword] = useState("");
   const [balanceAmount, setBalanceAmount] = useState("");
   const { toast } = useToast();
+  const { data: vipGroups } = useQuery<any[]>({ queryKey: ["/api/vip-groups"] });
 
   const filteredUsers = useMemo(() => {
     if (!users) return [];
@@ -322,6 +744,28 @@ function UsersManager() {
     }
   };
 
+  const handleVipGroupChange = async (userId: number, vipGroupId: string) => {
+    try {
+      await apiRequest("PATCH", `/api/admin/users/${userId}/vip-group`, {
+        vipGroupId: vipGroupId ? Number(vipGroupId) : null,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "تم تحديث مجموعة VIP" });
+    } catch (e: any) {
+      toast({ title: e.message || "خطأ", variant: "destructive" });
+    }
+  };
+
+  const handleCurrencyChange = async (userId: number, currency: string) => {
+    try {
+      await apiRequest("PATCH", `/api/admin/users/${userId}/currency`, { currency });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "تم تحديث العملة" });
+    } catch (e: any) {
+      toast({ title: e.message || "خطأ", variant: "destructive" });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row gap-4">
@@ -350,7 +794,15 @@ function UsersManager() {
                     {u.role === 'admin' ? <ShieldAlert className="w-5 h-5" /> : <Users className="w-5 h-5" />}
                   </div>
                   <div>
-                    <h4 className="font-bold text-white text-lg">{u.fullName}</h4>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-bold text-white text-lg">{u.fullName}</h4>
+                      {u.vipGroupId && vipGroups?.find((g: any) => g.id === u.vipGroupId) && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-500/10 border border-yellow-500/20 text-yellow-400" data-testid={`badge-vip-${u.id}`}>
+                          <Crown className="w-3 h-3 inline ml-1" />
+                          {vipGroups.find((g: any) => g.id === u.vipGroupId)?.name}
+                        </span>
+                      )}
+                    </div>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-400">
                       <span className="font-mono">{u.phoneNumber || u.email || '-'}</span>
                       <span className="text-teal-400 font-bold flex items-center gap-1"><Wallet className="w-3.5 h-3.5" /> {(u.balance || 0).toLocaleString()} ر.ي</span>
@@ -427,6 +879,26 @@ function UsersManager() {
                       </div>
                     </DialogContent>
                   </Dialog>
+
+                  <select
+                    value={u.vipGroupId || ""}
+                    onChange={e => handleVipGroupChange(u.id, e.target.value)}
+                    className="bg-black/20 border border-white/10 rounded-lg px-2 py-1.5 text-xs outline-none"
+                    data-testid={`select-vip-group-${u.id}`}
+                  >
+                    <option value="" className="bg-slate-900">بدون VIP</option>
+                    {vipGroups?.map((g: any) => <option key={g.id} value={g.id} className="bg-slate-900">{g.name}</option>)}
+                  </select>
+
+                  <select
+                    value={u.currency || "YER"}
+                    onChange={e => handleCurrencyChange(u.id, e.target.value)}
+                    className="bg-black/20 border border-white/10 rounded-lg px-2 py-1.5 text-xs outline-none"
+                    data-testid={`select-currency-${u.id}`}
+                  >
+                    <option value="YER" className="bg-slate-900">YER ر.ي</option>
+                    <option value="USD" className="bg-slate-900">USD $</option>
+                  </select>
                 </div>
               </div>
             </CardContent>
@@ -843,45 +1315,140 @@ function BanksManager() {
 function StoreSettingsManager() {
   const { data: settings, isLoading } = useSettings();
   const { mutate: updateSettings, isPending } = useUpdateSettings();
-  const form = useForm({ defaultValues: { storeName: "", logoUrl: "", adminWhatsapp: "" } });
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
+  const [maintenanceMessage, setMaintenanceMessage] = useState("");
+  const [togglingMaintenance, setTogglingMaintenance] = useState(false);
+  const { toast } = useToast();
+  const form = useForm({ defaultValues: { storeName: "", logoUrl: "", adminWhatsapp: "", exchangeRate: "" } });
 
   useEffect(() => {
     if (settings) {
-      form.reset({ storeName: settings.storeName || "", logoUrl: settings.logoUrl || "", adminWhatsapp: settings.adminWhatsapp || "" });
+      form.reset({
+        storeName: settings.storeName || "",
+        logoUrl: settings.logoUrl || "",
+        adminWhatsapp: settings.adminWhatsapp || "",
+        exchangeRate: settings.exchangeRate ? String(settings.exchangeRate) : "",
+      });
+      setMaintenanceEnabled(settings.maintenanceEnabled || false);
+      setMaintenanceMessage(settings.maintenanceMessage || "");
     }
   }, [settings, form]);
 
   const onSubmit = (data: any) => { updateSettings(data); };
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingLogo(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Upload failed");
+      const { url } = await res.json();
+      form.setValue("logoUrl", url);
+    } catch (error) {
+      console.error("Upload error:", error);
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
+
+  const handleToggleMaintenance = async () => {
+    setTogglingMaintenance(true);
+    try {
+      await apiRequest("POST", "/api/admin/maintenance/toggle", {
+        enabled: !maintenanceEnabled,
+        message: maintenanceMessage,
+      });
+      setMaintenanceEnabled(!maintenanceEnabled);
+      toast({ title: !maintenanceEnabled ? "تم تفعيل وضع الصيانة" : "تم إلغاء وضع الصيانة" });
+    } catch (e: any) {
+      toast({ title: e.message || "خطأ", variant: "destructive" });
+    } finally {
+      setTogglingMaintenance(false);
+    }
+  };
+
   return (
-    <Card className="bg-slate-900 border-white/5 max-w-2xl mx-auto">
-      <CardHeader><CardTitle className="flex items-center gap-2"><Settings className="w-5 h-5 text-primary" /> إعدادات المتجر</CardTitle></CardHeader>
-      <CardContent>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          <div className="space-y-2">
-            <label className="text-sm text-slate-400">اسم المتجر</label>
-            <Input {...form.register("storeName")} className="bg-black/20 border-white/10 h-12" />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm text-slate-400">رقم واتساب المدير (بدون +)</label>
-            <Input {...form.register("adminWhatsapp")} placeholder="967775477340" className="bg-black/20 border-white/10 h-12 font-mono" />
-            <p className="text-[10px] text-slate-500 mt-1 pr-1">* يستخدم لاستقبال الطلبات</p>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm text-slate-400">رابط الشعار</label>
-            <Input {...form.register("logoUrl")} className="bg-black/20 border-white/10 h-12" />
-            {settings?.logoUrl && (
-              <div className="mt-4 p-4 rounded-xl bg-black/40 border border-white/5 flex items-center justify-center">
-                <img src={settings.logoUrl} alt="Logo" className="h-20 object-contain" />
+    <div className="space-y-6 max-w-2xl mx-auto">
+      <Card className="bg-slate-900 border-white/5">
+        <CardHeader><CardTitle className="flex items-center gap-2"><Settings className="w-5 h-5 text-primary" /> إعدادات المتجر</CardTitle></CardHeader>
+        <CardContent>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-sm text-slate-400">اسم المتجر</label>
+              <Input {...form.register("storeName")} className="bg-black/20 border-white/10 h-12" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm text-slate-400">رقم واتساب المدير (بدون +)</label>
+              <Input {...form.register("adminWhatsapp")} placeholder="967775477340" className="bg-black/20 border-white/10 h-12 font-mono" />
+              <p className="text-[10px] text-slate-500 mt-1 pr-1">* يستخدم لاستقبال الطلبات</p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm text-slate-400">رابط الشعار</label>
+              <div className="flex gap-2">
+                <Input {...form.register("logoUrl")} className="bg-black/20 border-white/10 h-12 flex-1" />
+                <div className="relative">
+                  <input type="file" id="logo-upload" className="hidden" accept="image/*" onChange={handleLogoUpload} disabled={isUploadingLogo} />
+                  <Button type="button" variant="outline" className="h-12 px-4 border-white/10 bg-black/20 hover:bg-white/5 gap-2" onClick={() => document.getElementById("logo-upload")?.click()} disabled={isUploadingLogo} data-testid="button-upload-logo">
+                    {isUploadingLogo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    رفع
+                  </Button>
+                </div>
               </div>
-            )}
+              {settings?.logoUrl && (
+                <div className="mt-4 p-4 rounded-xl bg-black/40 border border-white/5 flex items-center justify-center">
+                  <img src={settings.logoUrl} alt="Logo" className="h-20 object-contain" />
+                </div>
+              )}
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm text-slate-400">سعر صرف الدولار (بالريال اليمني)</label>
+              <Input {...form.register("exchangeRate")} type="number" placeholder="مثلاً: 250" className="bg-black/20 border-white/10 h-12 font-mono" data-testid="input-exchange-rate" />
+            </div>
+            <Button type="submit" className="w-full bg-primary hover:bg-primary/90 h-12 rounded-xl font-bold shadow-lg shadow-primary/20" disabled={isPending} data-testid="button-save-settings">
+              {isPending ? <Loader2 className="animate-spin w-5 h-5" /> : 'حفظ التغييرات'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-slate-900 border-white/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Wrench className="w-5 h-5 text-orange-400" />
+            وضع الصيانة
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-4">
+            <div className={`w-3 h-3 rounded-full ${maintenanceEnabled ? 'bg-red-500' : 'bg-green-500'}`} />
+            <span className="text-sm text-slate-300">{maintenanceEnabled ? 'وضع الصيانة مفعل' : 'المتجر يعمل بشكل طبيعي'}</span>
           </div>
-          <Button type="submit" className="w-full bg-primary hover:bg-primary/90 h-12 rounded-xl font-bold shadow-lg shadow-primary/20" disabled={isPending}>
-            {isPending ? <Loader2 className="animate-spin w-5 h-5" /> : 'حفظ التغييرات'}
+          <div className="space-y-2">
+            <label className="text-sm text-slate-400">رسالة الصيانة</label>
+            <textarea
+              value={maintenanceMessage}
+              onChange={e => setMaintenanceMessage(e.target.value)}
+              placeholder="الموقع تحت الصيانة، سنعود قريباً..."
+              className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-sm focus:border-primary outline-none min-h-[80px] resize-none"
+              data-testid="input-maintenance-message"
+            />
+          </div>
+          <Button
+            onClick={handleToggleMaintenance}
+            disabled={togglingMaintenance}
+            className={`w-full h-12 rounded-xl font-bold gap-2 ${maintenanceEnabled ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
+            data-testid="button-toggle-maintenance"
+          >
+            {togglingMaintenance ? <Loader2 className="animate-spin w-4 h-4" /> : <Power className="w-4 h-4" />}
+            {maintenanceEnabled ? 'إلغاء وضع الصيانة' : 'تفعيل وضع الصيانة'}
           </Button>
-        </form>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 

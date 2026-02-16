@@ -14,6 +14,8 @@ export const users = pgTable("users", {
   role: text("role").notNull().default("user"),
   balance: integer("balance").default(0),
   active: boolean("active").default(true),
+  currency: text("currency").default("YER"),
+  vipGroupId: integer("vip_group_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -97,6 +99,9 @@ export const settings = pgTable("settings", {
   storeName: text("store_name").default("ويب ستور"),
   logoUrl: text("logo_url"),
   adminWhatsapp: text("admin_whatsapp"),
+  exchangeRate: numeric("exchange_rate", { precision: 15, scale: 2 }).default("1"),
+  maintenanceEnabled: boolean("maintenance_enabled").default(false),
+  maintenanceMessage: text("maintenance_message"),
 });
 
 // === API INTEGRATION TABLES ===
@@ -153,6 +158,40 @@ export const apiTokens = pgTable("api_tokens", {
   ipWhitelist: text("ip_whitelist"),
   lastUsedAt: timestamp("last_used_at"),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+// === DEPOSIT REQUESTS TABLE ===
+
+export const depositRequests = pgTable("deposit_requests", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  amount: integer("amount").notNull(),
+  receiptUrl: text("receipt_url").notNull(),
+  status: text("status").notNull().default("pending"),
+  fundId: integer("fund_id").references(() => funds.id),
+  approvedBy: integer("approved_by").references(() => users.id),
+  approvedAmount: integer("approved_amount"),
+  rejectionReason: text("rejection_reason"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// === VIP GROUPS TABLES ===
+
+export const vipGroups = pgTable("vip_groups", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  globalDiscount: numeric("global_discount", { precision: 5, scale: 2 }).default("0"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const vipServiceDiscounts = pgTable("vip_service_discounts", {
+  id: serial("id").primaryKey(),
+  vipGroupId: integer("vip_group_id").references(() => vipGroups.id).notNull(),
+  serviceId: integer("service_id").references(() => services.id).notNull(),
+  discountPercent: numeric("discount_percent", { precision: 5, scale: 2 }).notNull(),
 });
 
 // === NOTIFICATIONS TABLE ===
@@ -270,9 +309,11 @@ export const ordersRelations = relations(orders, ({ one }) => ({
   }),
 }));
 
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
   orders: many(orders),
   notifications: many(notifications),
+  vipGroup: one(vipGroups, { fields: [users.vipGroupId], references: [vipGroups.id] }),
+  depositRequests: many(depositRequests),
 }));
 
 export const notificationsRelations = relations(notifications, ({ one }) => ({
@@ -327,6 +368,22 @@ export const fundTransactionsRelations = relations(fundTransactions, ({ one }) =
   fund: one(funds, { fields: [fundTransactions.fundId], references: [funds.id] }),
   entry: one(journalEntries, { fields: [fundTransactions.relatedEntryId], references: [journalEntries.id] }),
   order: one(orders, { fields: [fundTransactions.relatedOrderId], references: [orders.id] }),
+}));
+
+export const depositRequestsRelations = relations(depositRequests, ({ one }) => ({
+  user: one(users, { fields: [depositRequests.userId], references: [users.id] }),
+  fund: one(funds, { fields: [depositRequests.fundId], references: [funds.id] }),
+  approver: one(users, { fields: [depositRequests.approvedBy], references: [users.id] }),
+}));
+
+export const vipGroupsRelations = relations(vipGroups, ({ many }) => ({
+  users: many(users),
+  serviceDiscounts: many(vipServiceDiscounts),
+}));
+
+export const vipServiceDiscountsRelations = relations(vipServiceDiscounts, ({ one }) => ({
+  vipGroup: one(vipGroups, { fields: [vipServiceDiscounts.vipGroupId], references: [vipGroups.id] }),
+  service: one(services, { fields: [vipServiceDiscounts.serviceId], references: [services.id] }),
 }));
 
 // === BASE SCHEMAS ===
@@ -418,6 +475,21 @@ export type InsertPasswordResetCode = z.infer<typeof insertPasswordResetCodeSche
 export const insertAdminActivityLogSchema = createInsertSchema(adminActivityLogs).omit({ id: true, createdAt: true });
 export type AdminActivityLog = typeof adminActivityLogs.$inferSelect;
 export type InsertAdminActivityLog = z.infer<typeof insertAdminActivityLogSchema>;
+
+// Deposit request schemas
+export const insertDepositRequestSchema = createInsertSchema(depositRequests).omit({ id: true, createdAt: true, updatedAt: true, status: true, approvedBy: true, approvedAmount: true, rejectionReason: true, fundId: true });
+export type DepositRequest = typeof depositRequests.$inferSelect;
+export type InsertDepositRequest = z.infer<typeof insertDepositRequestSchema>;
+
+// VIP group schemas
+export const insertVipGroupSchema = createInsertSchema(vipGroups).omit({ id: true, createdAt: true });
+export type VipGroup = typeof vipGroups.$inferSelect;
+export type InsertVipGroup = z.infer<typeof insertVipGroupSchema>;
+
+// VIP service discount schemas
+export const insertVipServiceDiscountSchema = createInsertSchema(vipServiceDiscounts).omit({ id: true });
+export type VipServiceDiscount = typeof vipServiceDiscounts.$inferSelect;
+export type InsertVipServiceDiscount = z.infer<typeof insertVipServiceDiscountSchema>;
 
 // Request types
 export type LoginRequest = { identifier: string; password: string };

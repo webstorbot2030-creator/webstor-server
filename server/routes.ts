@@ -34,11 +34,24 @@ export async function registerRoutes(
   // Set up authentication
   setupAuth(app);
 
+  // Maintenance mode middleware
+  app.use("/api", async (req, res, next) => {
+    if (req.path === "/user" || req.path === "/login" || req.path === "/register" || req.path === "/logout" || req.path.startsWith("/admin") || req.path === "/settings") {
+      return next();
+    }
+    if (req.user?.role === "admin") return next();
+    const settingsData = await storage.getSettings();
+    if (settingsData?.maintenanceEnabled) {
+      return res.status(503).json({ message: settingsData.maintenanceMessage || "النظام تحت الصيانة حالياً" });
+    }
+    next();
+  });
+
   // Serve uploads folder
   app.use("/uploads", express.static("uploads"));
 
   app.post("/api/upload", upload.single("file"), (req, res) => {
-    if (req.user?.role !== "admin") return res.sendStatus(403);
+    if (!req.isAuthenticated()) return res.sendStatus(401);
     if (!req.file) return res.status(400).send("No file uploaded");
     const url = `/uploads/${req.file.filename}`;
     res.json({ url });
@@ -178,6 +191,27 @@ export async function registerRoutes(
       }
     } catch (e) {
       console.error("Failed to create notification:", e);
+    }
+
+    if (status === "rejected") {
+      try {
+        const service = await storage.getService(order.serviceId);
+        if (service) {
+          const user = await storage.getUser(order.userId);
+          if (user) {
+            const newBalance = (user.balance || 0) + service.price;
+            await storage.updateUserBalance(order.userId, newBalance);
+            await storage.createNotification({
+              userId: order.userId,
+              type: "success",
+              title: "تم استرداد رصيدك",
+              message: `تم إرجاع ${service.price.toLocaleString()} ر.ي إلى رصيدك بسبب رفض الطلب #${order.id}. رصيدك الحالي: ${newBalance.toLocaleString()} ر.ي`,
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Failed to refund balance on rejection:", e);
+      }
     }
 
     if (status === "processing") {
@@ -368,6 +402,233 @@ export async function registerRoutes(
       }
       throw e;
     }
+  });
+
+  // === Deposit Requests ===
+  app.post("/api/deposit-requests", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const { amount, receiptUrl } = req.body;
+    if (!amount || !receiptUrl) return res.status(400).json({ message: "المبلغ وصورة الإشعار مطلوبان" });
+    const deposit = await storage.createDepositRequest({
+      userId: req.user!.id,
+      amount: Number(amount),
+      receiptUrl,
+      status: "pending",
+    });
+    try {
+      const allUsers = await storage.getAllUsers();
+      const admins = allUsers.filter(u => u.role === "admin");
+      for (const admin of admins) {
+        await storage.createNotification({
+          userId: admin.id,
+          type: "order",
+          title: "طلب تغذية رصيد جديد",
+          message: `المستخدم ${req.user!.fullName} طلب تغذية رصيد بمبلغ ${Number(amount).toLocaleString()} ر.ي`,
+        });
+      }
+    } catch (e) { console.error(e); }
+    res.status(201).json(deposit);
+  });
+
+  app.get("/api/deposit-requests", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const deposits = await storage.getUserDepositRequests(req.user!.id);
+    res.json(deposits);
+  });
+
+  app.get("/api/admin/deposit-requests", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const status = req.query.status as string | undefined;
+    const deposits = await storage.getDepositRequests(status);
+    res.json(deposits);
+  });
+
+  app.patch("/api/admin/deposit-requests/:id", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const id = Number(req.params.id);
+    const { status, approvedAmount, fundId, rejectionReason, notes } = req.body;
+
+    if (status === "approved") {
+      if (!approvedAmount || !fundId) {
+        return res.status(400).json({ message: "المبلغ والصندوق مطلوبان للموافقة" });
+      }
+      const deposit = await storage.updateDepositRequest(id, {
+        status: "approved",
+        approvedAmount: Number(approvedAmount),
+        fundId: Number(fundId),
+        approvedBy: req.user!.id,
+        updatedAt: new Date(),
+        notes,
+      });
+
+      const user = await storage.getUser(deposit.userId);
+      if (user) {
+        const newBalance = (user.balance || 0) + Number(approvedAmount);
+        await storage.updateUserBalance(deposit.userId, newBalance);
+
+        await storage.createNotification({
+          userId: deposit.userId,
+          type: "success",
+          title: "تمت الموافقة على طلب التغذية",
+          message: `تم إضافة ${Number(approvedAmount).toLocaleString()} ر.ي إلى رصيدك. رصيدك الحالي: ${newBalance.toLocaleString()} ر.ي`,
+        });
+
+        try {
+          const allAccounts = await storage.getAccounts();
+          const cashAccount = allAccounts.find(a => a.code === "1101");
+          const customerDepositAccount = allAccounts.find(a => a.code === "2100") || allAccounts.find(a => a.type === "liability");
+          if (cashAccount && customerDepositAccount) {
+            const now = new Date();
+            let period = await storage.getOpenPeriod(now.getFullYear(), now.getMonth() + 1);
+            if (!period) {
+              period = await storage.createAccountingPeriod({ year: now.getFullYear(), month: now.getMonth() + 1, periodType: "monthly", status: "open" });
+            }
+            if (period.status === "open") {
+              const entryNumber = await storage.getNextEntryNumber();
+              const amount = String(approvedAmount);
+              await storage.createJournalEntry(
+                { entryNumber, entryDate: new Date(), description: `تغذية رصيد ${user.fullName} - طلب #${id}`, sourceType: "deposit", sourceId: id, periodId: period.id, totalDebit: amount, totalCredit: amount, createdBy: req.user!.id },
+                [
+                  { entryId: 0, accountId: cashAccount.id, debit: amount, credit: "0", fundId: Number(fundId) },
+                  { entryId: 0, accountId: customerDepositAccount.id, debit: "0", credit: amount },
+                ]
+              );
+              await storage.createFundTransaction({ fundId: Number(fundId), transactionType: "deposit", amount, description: `تغذية رصيد ${user.fullName}`, relatedEntryId: null });
+            }
+          }
+        } catch (e) { console.error("Failed to create deposit journal entry:", e); }
+
+        await storage.createAdminActivityLog({
+          userId: req.user!.id,
+          action: "موافقة على تغذية رصيد",
+          details: `موافقة على تغذية ${approvedAmount} ر.ي للمستخدم ${user.fullName}`,
+          targetType: "deposit",
+          targetId: id,
+        });
+      }
+      res.json(deposit);
+    } else if (status === "rejected") {
+      const deposit = await storage.updateDepositRequest(id, {
+        status: "rejected",
+        rejectionReason,
+        updatedAt: new Date(),
+      });
+      const user = await storage.getUser(deposit.userId);
+      if (user) {
+        await storage.createNotification({
+          userId: deposit.userId,
+          type: "error",
+          title: "تم رفض طلب التغذية",
+          message: rejectionReason ? `سبب الرفض: ${rejectionReason}` : "تم رفض طلب تغذية الرصيد",
+        });
+      }
+      res.json(deposit);
+    } else {
+      res.status(400).json({ message: "حالة غير صحيحة" });
+    }
+  });
+
+  // === VIP Groups ===
+  app.get("/api/vip-groups", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const groups = await storage.getVipGroups();
+    res.json(groups);
+  });
+
+  app.post("/api/vip-groups", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const group = await storage.createVipGroup(req.body);
+    res.status(201).json(group);
+  });
+
+  app.patch("/api/vip-groups/:id", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const group = await storage.updateVipGroup(Number(req.params.id), req.body);
+    res.json(group);
+  });
+
+  app.delete("/api/vip-groups/:id", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    await storage.deleteVipServiceDiscountsByGroup(Number(req.params.id));
+    await storage.deleteVipGroup(Number(req.params.id));
+    res.sendStatus(204);
+  });
+
+  app.get("/api/vip-groups/:id/discounts", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const discounts = await storage.getVipServiceDiscounts(Number(req.params.id));
+    res.json(discounts);
+  });
+
+  app.post("/api/vip-groups/:id/discounts", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const { serviceId, discountPercent } = req.body;
+    const discount = await storage.createVipServiceDiscount({
+      vipGroupId: Number(req.params.id),
+      serviceId: Number(serviceId),
+      discountPercent: String(discountPercent),
+    });
+    res.status(201).json(discount);
+  });
+
+  app.delete("/api/vip-discounts/:id", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    await storage.deleteVipServiceDiscount(Number(req.params.id));
+    res.sendStatus(204);
+  });
+
+  app.patch("/api/admin/users/:id/vip-group", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const { vipGroupId } = req.body;
+    const user = await storage.updateUser(Number(req.params.id), { vipGroupId: vipGroupId || null });
+    res.json({ ...user, password: undefined });
+  });
+
+  app.get("/api/user/prices", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const user = await storage.getUser(req.user!.id);
+    if (!user || !user.vipGroupId) {
+      return res.json({ discounts: {} });
+    }
+    const groupDiscounts = await storage.getVipServiceDiscounts(user.vipGroupId);
+    const vipGroup = await storage.getVipGroup(user.vipGroupId);
+    res.json({
+      globalDiscount: vipGroup?.globalDiscount || "0",
+      discounts: Object.fromEntries(groupDiscounts.map(d => [d.serviceId, d.discountPercent])),
+    });
+  });
+
+  // === Maintenance Toggle ===
+  app.post("/api/admin/maintenance/toggle", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const { enabled, message } = req.body;
+    const updated = await storage.updateSettings({
+      maintenanceEnabled: enabled,
+      maintenanceMessage: message || "النظام تحت الصيانة حالياً، يرجى المحاولة لاحقاً",
+    });
+    if (enabled) {
+      try {
+        const allUsers = await storage.getAllUsers();
+        for (const u of allUsers.filter(u => u.role !== "admin")) {
+          await storage.createNotification({
+            userId: u.id,
+            type: "info",
+            title: "إشعار صيانة",
+            message: message || "النظام تحت الصيانة حالياً، يرجى المحاولة لاحقاً",
+          });
+        }
+      } catch (e) { console.error(e); }
+    }
+    res.json(updated);
+  });
+
+  // === Admin User Currency ===
+  app.patch("/api/admin/users/:id/currency", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const { currency } = req.body;
+    if (!["YER", "USD"].includes(currency)) return res.status(400).json({ message: "عملة غير صحيحة" });
+    const user = await storage.updateUser(Number(req.params.id), { currency });
+    res.json({ ...user, password: undefined });
   });
 
   // === Service Group & Service Toggle ===

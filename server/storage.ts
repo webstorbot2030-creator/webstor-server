@@ -4,6 +4,7 @@ import {
   accounts, funds, accountingPeriods, journalEntries, journalLines, fundTransactions,
   apiProviders, apiServiceMappings, apiOrderLogs, apiTokens, notifications,
   passwordResetCodes, adminActivityLogs,
+  depositRequests, vipGroups, vipServiceDiscounts,
   type User, type InsertUser,
   type Category, type InsertCategory,
   type ServiceGroup, type InsertServiceGroup,
@@ -25,6 +26,9 @@ import {
   type Notification, type InsertNotification,
   type PasswordResetCode, type InsertPasswordResetCode,
   type AdminActivityLog, type InsertAdminActivityLog,
+  type DepositRequest, type InsertDepositRequest,
+  type VipGroup, type InsertVipGroup,
+  type VipServiceDiscount, type InsertVipServiceDiscount,
 } from "@shared/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 
@@ -179,6 +183,25 @@ export interface IStorage {
 
   // Dashboard Stats
   getDashboardStats(): Promise<{ totalUsers: number; totalOrders: number; todayOrders: number; totalRevenue: number; pendingOrders: number; completedOrders: number; newUsersToday: number }>;
+
+  // Deposit Requests
+  getDepositRequests(status?: string): Promise<any[]>;
+  getUserDepositRequests(userId: number): Promise<any[]>;
+  createDepositRequest(data: InsertDepositRequest): Promise<DepositRequest>;
+  updateDepositRequest(id: number, data: Partial<DepositRequest>): Promise<DepositRequest>;
+
+  // VIP Groups
+  getVipGroups(): Promise<VipGroup[]>;
+  getVipGroup(id: number): Promise<VipGroup | undefined>;
+  createVipGroup(data: InsertVipGroup): Promise<VipGroup>;
+  updateVipGroup(id: number, data: Partial<VipGroup>): Promise<VipGroup>;
+  deleteVipGroup(id: number): Promise<void>;
+
+  // VIP Service Discounts
+  getVipServiceDiscounts(vipGroupId: number): Promise<VipServiceDiscount[]>;
+  createVipServiceDiscount(data: InsertVipServiceDiscount): Promise<VipServiceDiscount>;
+  deleteVipServiceDiscount(id: number): Promise<void>;
+  deleteVipServiceDiscountsByGroup(vipGroupId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -832,6 +855,82 @@ export class DatabaseStorage implements IStorage {
       completedOrders: Number(completedResult.rows[0]?.count || 0),
       newUsersToday: Number(newUsersResult.rows[0]?.count || 0),
     };
+  }
+
+  // Deposit Requests
+  async getDepositRequests(status?: string): Promise<any[]> {
+    if (status) {
+      const results = await db.query.depositRequests.findMany({
+        where: eq(depositRequests.status, status),
+        with: { user: true, fund: true },
+        orderBy: [desc(depositRequests.createdAt)],
+      });
+      return results;
+    }
+    return await db.query.depositRequests.findMany({
+      with: { user: true, fund: true },
+      orderBy: [desc(depositRequests.createdAt)],
+    });
+  }
+
+  async getUserDepositRequests(userId: number): Promise<any[]> {
+    return await db.query.depositRequests.findMany({
+      where: eq(depositRequests.userId, userId),
+      with: { fund: true },
+      orderBy: [desc(depositRequests.createdAt)],
+    });
+  }
+
+  async createDepositRequest(data: InsertDepositRequest): Promise<DepositRequest> {
+    const [created] = await db.insert(depositRequests).values(data).returning();
+    return created;
+  }
+
+  async updateDepositRequest(id: number, data: Partial<DepositRequest>): Promise<DepositRequest> {
+    const [updated] = await db.update(depositRequests).set(data).where(eq(depositRequests.id, id)).returning();
+    return updated;
+  }
+
+  // VIP Groups
+  async getVipGroups(): Promise<VipGroup[]> {
+    return await db.select().from(vipGroups);
+  }
+
+  async getVipGroup(id: number): Promise<VipGroup | undefined> {
+    const [group] = await db.select().from(vipGroups).where(eq(vipGroups.id, id));
+    return group;
+  }
+
+  async createVipGroup(data: InsertVipGroup): Promise<VipGroup> {
+    const [created] = await db.insert(vipGroups).values(data).returning();
+    return created;
+  }
+
+  async updateVipGroup(id: number, data: Partial<VipGroup>): Promise<VipGroup> {
+    const [updated] = await db.update(vipGroups).set(data).where(eq(vipGroups.id, id)).returning();
+    return updated;
+  }
+
+  async deleteVipGroup(id: number): Promise<void> {
+    await db.delete(vipGroups).where(eq(vipGroups.id, id));
+  }
+
+  // VIP Service Discounts
+  async getVipServiceDiscounts(vipGroupId: number): Promise<VipServiceDiscount[]> {
+    return await db.select().from(vipServiceDiscounts).where(eq(vipServiceDiscounts.vipGroupId, vipGroupId));
+  }
+
+  async createVipServiceDiscount(data: InsertVipServiceDiscount): Promise<VipServiceDiscount> {
+    const [created] = await db.insert(vipServiceDiscounts).values(data).returning();
+    return created;
+  }
+
+  async deleteVipServiceDiscount(id: number): Promise<void> {
+    await db.delete(vipServiceDiscounts).where(eq(vipServiceDiscounts.id, id));
+  }
+
+  async deleteVipServiceDiscountsByGroup(vipGroupId: number): Promise<void> {
+    await db.delete(vipServiceDiscounts).where(eq(vipServiceDiscounts.vipGroupId, vipGroupId));
   }
 }
 
