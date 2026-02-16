@@ -17,16 +17,26 @@ export const users = pgTable("users", {
 export const categories = pgTable("categories", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
-  icon: text("icon"), // Lucide icon name
+  icon: text("icon"), // Lucide icon name or image URL
+  image: text("image"), // Added image field
 });
 
-export const services = pgTable("services", {
+// "Games" or "Main Services" that belong to a category
+export const serviceGroups = pgTable("service_groups", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
-  price: integer("price").notNull(), // Stored in smallest unit or just number
   categoryId: integer("category_id").references(() => categories.id).notNull(),
-  note: text("note"), // Instructions for the user
-  image: text("image"), // URL or icon name
+  image: text("image"),
+  note: text("note"),
+  active: boolean("active").default(true),
+});
+
+// "Prices/Packages" that belong to a service group
+export const services = pgTable("services", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(), // e.g. "60 UC", "100 Gems"
+  price: integer("price").notNull(),
+  serviceGroupId: integer("service_group_id").references(() => serviceGroups.id).notNull(),
   active: boolean("active").default(true),
 });
 
@@ -64,16 +74,24 @@ export const settings = pgTable("settings", {
 
 // === RELATIONS ===
 
-export const servicesRelations = relations(services, ({ one, many }) => ({
-  category: one(categories, {
-    fields: [services.categoryId],
-    references: [categories.id],
-  }),
-  orders: many(orders),
+export const categoriesRelations = relations(categories, ({ many }) => ({
+  groups: many(serviceGroups),
 }));
 
-export const categoriesRelations = relations(categories, ({ many }) => ({
+export const serviceGroupsRelations = relations(serviceGroups, ({ one, many }) => ({
+  category: one(categories, {
+    fields: [serviceGroups.categoryId],
+    references: [categories.id],
+  }),
   services: many(services),
+}));
+
+export const servicesRelations = relations(services, ({ one, many }) => ({
+  group: one(serviceGroups, {
+    fields: [services.serviceGroupId],
+    references: [serviceGroups.id],
+  }),
+  orders: many(orders),
 }));
 
 export const ordersRelations = relations(orders, ({ one }) => ({
@@ -95,6 +113,7 @@ export const usersRelations = relations(users, ({ many }) => ({
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertCategorySchema = createInsertSchema(categories).omit({ id: true });
+export const insertServiceGroupSchema = createInsertSchema(serviceGroups).omit({ id: true });
 export const insertServiceSchema = createInsertSchema(services).omit({ id: true });
 export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, createdAt: true, status: true, rejectionReason: true });
 export const insertBankSchema = createInsertSchema(banks).omit({ id: true });
@@ -108,6 +127,9 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 
 export type Category = typeof categories.$inferSelect;
 export type InsertCategory = z.infer<typeof insertCategorySchema>;
+
+export type ServiceGroup = typeof serviceGroups.$inferSelect;
+export type InsertServiceGroup = z.infer<typeof insertServiceGroupSchema>;
 
 export type Service = typeof services.$inferSelect;
 export type InsertService = z.infer<typeof insertServiceSchema>;
@@ -128,7 +150,3 @@ export type InsertSetting = z.infer<typeof insertSettingsSchema>;
 export type LoginRequest = { phoneNumber: string; password: string };
 export type CreateOrderRequest = { serviceId: number; userInputId: string };
 export type UpdateOrderRequest = { status: string; rejectionReason?: string };
-
-// Response types extended with relations
-export type ServiceWithCategory = Service & { category: Category };
-export type OrderWithDetails = Order & { service: Service; user: User };
