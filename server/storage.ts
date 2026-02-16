@@ -48,6 +48,7 @@ export interface IStorage {
   // Categories
   getCategories(): Promise<Category[]>;
   createCategory(category: InsertCategory): Promise<Category>;
+  updateCategory(id: number, data: Partial<Category>): Promise<Category>;
   deleteCategory(id: number): Promise<void>;
 
   // Service Groups
@@ -64,6 +65,7 @@ export interface IStorage {
   deleteService(id: number): Promise<void>;
 
   // Orders
+  getOrder(id: number): Promise<Order | undefined>;
   createOrder(order: InsertOrder): Promise<Order>;
   getUserOrders(userId: number): Promise<(Order & { service: Service })[]>;
   getAllOrders(status?: string): Promise<(Order & { service: Service; user: User })[]>;
@@ -72,11 +74,13 @@ export interface IStorage {
   // Banks
   getBanks(): Promise<Bank[]>;
   createBank(bank: InsertBank): Promise<Bank>;
+  updateBank(id: number, data: Partial<Bank>): Promise<Bank>;
   deleteBank(id: number): Promise<void>;
 
   // Ads
   getAds(): Promise<Ad[]>;
   createAd(ad: InsertAd): Promise<Ad>;
+  updateAd(id: number, data: Partial<Ad>): Promise<Ad>;
   deleteAd(id: number): Promise<void>;
 
   // Users Management
@@ -240,6 +244,11 @@ export class DatabaseStorage implements IStorage {
     return category;
   }
 
+  async updateCategory(id: number, data: Partial<Category>): Promise<Category> {
+    const [updated] = await db.update(categories).set(data).where(eq(categories.id, id)).returning();
+    return updated;
+  }
+
   async deleteCategory(id: number): Promise<void> {
     await db.delete(categories).where(eq(categories.id, id));
   }
@@ -288,6 +297,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Orders
+  async getOrder(id: number): Promise<Order | undefined> {
+    const [order] = await db.select().from(orders).where(eq(orders.id, id));
+    return order;
+  }
+
   async createOrder(insertOrder: InsertOrder): Promise<Order> {
     const [order] = await db.insert(orders).values(insertOrder).returning();
     return order;
@@ -334,6 +348,11 @@ export class DatabaseStorage implements IStorage {
     return bank;
   }
 
+  async updateBank(id: number, data: Partial<Bank>): Promise<Bank> {
+    const [updated] = await db.update(banks).set(data).where(eq(banks.id, id)).returning();
+    return updated;
+  }
+
   async deleteBank(id: number): Promise<void> {
     await db.delete(banks).where(eq(banks.id, id));
   }
@@ -346,6 +365,11 @@ export class DatabaseStorage implements IStorage {
   async createAd(insertAd: InsertAd): Promise<Ad> {
     const [ad] = await db.insert(ads).values(insertAd).returning();
     return ad;
+  }
+
+  async updateAd(id: number, data: Partial<Ad>): Promise<Ad> {
+    const [updated] = await db.update(ads).set(data).where(eq(ads.id, id)).returning();
+    return updated;
   }
 
   async deleteAd(id: number): Promise<void> {

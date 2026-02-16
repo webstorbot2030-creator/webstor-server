@@ -17,7 +17,11 @@ The app features:
 - An admin panel for managing categories, services, orders, deposits, VIP groups, ads, banks, users, and settings
 - A full accounting system with chart of accounts, funds, journal entries, trial balance, and period management
 - Automatic journal entry creation when orders are completed and deposits approved
-- A glassmorphism dark-themed UI with full RTL (right-to-left) support
+- Dark/Light mode toggle with localStorage persistence
+- New account approval system (admin must activate new accounts)
+- Edit functionality for banks, ads, categories in admin panel
+- Order reset (completed/rejected orders can be returned to pending with proper balance handling)
+- A glassmorphism themed UI with full RTL (right-to-left) support
 
 ## User Preferences
 

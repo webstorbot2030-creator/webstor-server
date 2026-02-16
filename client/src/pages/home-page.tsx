@@ -78,7 +78,7 @@ export default function HomePage() {
               className={`px-6 py-3 rounded-xl transition-all duration-300 font-bold text-sm sm:text-base ${
                 activeCategory === 'all' 
                   ? 'bg-gradient-to-r from-primary to-orange-400 text-white shadow-lg shadow-primary/25' 
-                  : 'bg-white/5 hover:bg-white/10 text-gray-300'
+                  : 'bg-white/5 dark:bg-white/5 bg-gray-100 hover:bg-white/10 dark:text-gray-300 text-gray-600'
               }`}
             >
               الكل
@@ -90,7 +90,7 @@ export default function HomePage() {
                 className={`px-6 py-3 rounded-xl transition-all duration-300 font-bold text-sm sm:text-base flex items-center gap-2 ${
                   activeCategory === cat.id 
                     ? 'bg-gradient-to-r from-primary to-orange-400 text-white shadow-lg shadow-primary/25' 
-                    : 'bg-white/5 hover:bg-white/10 text-gray-300'
+                    : 'bg-white/5 dark:bg-white/5 bg-gray-100 hover:bg-white/10 dark:text-gray-300 text-gray-600'
                 }`}
               >
                 {cat.name}
@@ -115,10 +115,10 @@ export default function HomePage() {
                 className="flex items-center justify-between p-6 cursor-pointer group hover:border-primary/50 transition-all duration-300"
               >
                 <div className="flex flex-col items-start gap-1">
-                  <h3 className="font-bold text-white text-xl group-hover:text-primary transition-colors">
+                  <h3 className="font-bold dark:text-white text-gray-900 text-xl group-hover:text-primary transition-colors">
                     {group.name}
                   </h3>
-                  <p className="text-gray-400 text-sm">
+                  <p className="dark:text-gray-400 text-gray-500 text-sm">
                     {categories?.find((c: any) => c.id === group.categoryId)?.name || 'قسم الخدمات'}
                   </p>
                 </div>
@@ -151,7 +151,7 @@ export default function HomePage() {
               <span className="text-gray-600">|</span>
               <a href="/terms" className="text-primary/70 hover:text-primary transition-colors" data-testid="link-terms">الشروط والأحكام</a>
             </div>
-            <p className="text-gray-400 text-sm">جميع الحقوق محفوظة &copy; 2025 ويب ستور</p>
+            <p className="dark:text-gray-400 text-gray-500 text-sm">جميع الحقوق محفوظة &copy; 2025 ويب ستور</p>
           </div>
         </footer>
       </div>

@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { ShoppingBag, Landmark, Settings, LogOut, User as UserIcon, Bell, Check, CheckCheck, Trash2, Wallet } from "lucide-react";
+import { ShoppingBag, Landmark, Settings, LogOut, User as UserIcon, Bell, Check, CheckCheck, Trash2, Wallet, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { MyOrdersModal } from "./my-orders-modal";
@@ -10,6 +10,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
+import { useTheme } from "@/hooks/use-theme";
 
 function playNotificationSound() {
   try {
@@ -31,6 +32,7 @@ function playNotificationSound() {
 export function Navbar() {
   const { user, logout } = useAuth();
   const { data: settings } = useSettings();
+  const { theme, toggleTheme } = useTheme();
   const [showOrders, setShowOrders] = useState(false);
   const [showBanks, setShowBanks] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -95,13 +97,7 @@ export function Navbar() {
         <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
           <Link href="/">
             <div className="flex items-center gap-3 cursor-pointer group">
-              {settings?.logoUrl ? (
-                <img src={settings.logoUrl} alt="Logo" className="w-12 h-12 rounded-xl object-cover shadow-lg" />
-              ) : (
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-orange-600 flex items-center justify-center shadow-lg group-hover:shadow-primary/50 transition-all duration-300">
-                  <ShoppingBag className="text-white w-6 h-6" />
-                </div>
-              )}
+              <img src={settings?.logoUrl || "/logo-default.png"} alt="Logo" className="w-12 h-12 rounded-xl object-cover shadow-lg" />
               <h1 className="text-2xl font-bold bg-gradient-to-l from-primary to-teal-400 bg-clip-text text-transparent">
                 {settings?.storeName || "ويب ستور"}
               </h1>
@@ -110,6 +106,15 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-2 md:gap-3 flex-wrap justify-center w-full md:w-auto">
+          <Button
+            variant="ghost"
+            className="dark:bg-white/5 bg-gray-100 dark:hover:bg-white/10 hover:bg-gray-200 border dark:border-white/5 border-gray-200 rounded-xl text-sm h-10 w-10 p-0"
+            onClick={toggleTheme}
+            data-testid="button-theme-toggle"
+          >
+            {theme === "dark" ? <Sun className="w-4 h-4 text-yellow-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
+          </Button>
+
           {user ? (
             <>
               <div className="relative">
@@ -130,9 +135,9 @@ export function Navbar() {
                 {showNotifications && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
-                    <div className="absolute left-0 md:right-0 md:left-auto top-12 w-80 md:w-96 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 max-h-[70vh] overflow-hidden flex flex-col" data-testid="notification-panel">
-                      <div className="flex items-center justify-between p-4 border-b border-white/5">
-                        <h3 className="font-bold text-white text-sm">الإشعارات</h3>
+                    <div className="absolute left-0 md:right-0 md:left-auto top-12 w-80 md:w-96 dark:bg-slate-900 bg-white border dark:border-white/10 border-gray-200 rounded-2xl shadow-2xl z-50 max-h-[70vh] overflow-hidden flex flex-col" data-testid="notification-panel">
+                      <div className="flex items-center justify-between p-4 border-b dark:border-white/5 border-gray-100">
+                        <h3 className="font-bold dark:text-white text-gray-900 text-sm">الإشعارات</h3>
                         {count > 0 && (
                           <Button variant="ghost" size="sm" className="text-xs text-blue-400 hover:text-blue-300 h-7" onClick={() => markAllReadMutation.mutate()} data-testid="button-mark-all-read">
                             <CheckCheck className="w-3 h-3 ml-1" />

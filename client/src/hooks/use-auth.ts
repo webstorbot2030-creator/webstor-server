@@ -62,17 +62,19 @@ export function useAuth() {
       }
       return await res.json();
     },
-    onSuccess: () => {
-      // Auto login logic handled by session usually, but let's confirm
-      // Often register endpoints don't auto-login in REST patterns unless specified
-      // For this app, let's assume we need to login or the user is auto logged in. 
-      // If using Passport session, req.login is often called on register.
-      // We will invalidate 'me' to be safe.
-      queryClient.invalidateQueries({ queryKey: [api.auth.me.path] });
-      toast({
-        title: "تم إنشاء الحساب",
-        description: "تم إنشاء حسابك بنجاح",
-      });
+    onSuccess: (data) => {
+      if (data.needsApproval) {
+        toast({
+          title: "تم إنشاء الحساب بنجاح",
+          description: "حسابك بانتظار موافقة الإدارة. سيتم إشعارك عند تفعيل حسابك.",
+        });
+      } else {
+        queryClient.invalidateQueries({ queryKey: [api.auth.me.path] });
+        toast({
+          title: "تم إنشاء الحساب",
+          description: "تم إنشاء حسابك بنجاح",
+        });
+      }
     },
     onError: (error: Error) => {
       toast({
