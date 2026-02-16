@@ -12,29 +12,31 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { useSettings, useServiceGroups } from "@/hooks/use-store";
+import { useSettings, useServiceGroups, useServices } from "@/hooks/use-store";
 
 const orderSchema = z.object({
   userInputId: z.string().min(1, "هذا الحقل مطلوب"),
 });
 
 interface OrderModalProps {
-  service: Service | null;
+  serviceGroup: ServiceGroup | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function OrderModal({ service, open, onOpenChange }: OrderModalProps) {
+export function OrderModal({ serviceGroup, open, onOpenChange }: OrderModalProps) {
   const { mutate: createOrder, isPending } = useCreateOrder();
   const [success, setSuccess] = useState(false);
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { data: settings } = useSettings();
-  const { data: groups } = useServiceGroups();
+  const { data: services } = useServices();
+  
+  const [selectedService, setSelectedService] = useState<Service | null>(null);
 
-  const currentGroup = groups?.find((g: any) => g.id === service?.serviceGroupId);
-  const isAuthInput = currentGroup?.inputType === 'auth';
+  const isAuthInput = serviceGroup?.inputType === 'auth';
+  const groupServices = services?.filter(s => s.serviceGroupId === serviceGroup?.id) || [];
 
   const form = useForm<z.infer<typeof orderSchema>>({
     resolver: zodResolver(orderSchema),
@@ -54,18 +56,24 @@ export function OrderModal({ service, open, onOpenChange }: OrderModalProps) {
       return;
     }
 
-    if (!service) return;
+    if (!selectedService) {
+      toast({
+        title: "تنبيه",
+        description: "يرجى اختيار الفئة المطلوبة أولاً",
+        variant: "destructive",
+      });
+      return;
+    }
 
     createOrder(
-      { serviceId: service.id, userInputId: data.userInputId },
+      { serviceId: selectedService.id, userInputId: data.userInputId },
       {
         onSuccess: () => {
           setSuccess(true);
           form.reset();
           
-          // Redirect to WhatsApp if setting exists
           if (settings?.adminWhatsapp) {
-            const message = `طلب جديد من ويب ستور\n------------------\nالخدمة: ${service.name}\nالمعرف: ${data.userInputId}\nالسعر: ${service.price} ر.ي\nاسم العميل: ${user.fullName}\nرقم الهاتف: ${user.phoneNumber}`;
+            const message = `طلب جديد من ويب ستور\n------------------\nالخدمة: ${selectedService.name}\nالمعرف: ${data.userInputId}\nالسعر: ${selectedService.price} ر.ي\nاسم العميل: ${user.fullName}\nرقم الهاتف: ${user.phoneNumber}`;
             const whatsappUrl = `https://wa.me/${settings.adminWhatsapp.replace(/\+/g, '')}?text=${encodeURIComponent(message)}`;
             window.open(whatsappUrl, '_blank');
           }
@@ -74,29 +82,24 @@ export function OrderModal({ service, open, onOpenChange }: OrderModalProps) {
     );
   };
 
-  // Reset state when closing/opening
   const handleOpenChange = (val: boolean) => {
     if (!val) {
-      setTimeout(() => setSuccess(false), 300); // Reset after anim
+      setTimeout(() => {
+        setSuccess(false);
+        setSelectedService(null);
+      }, 300);
     }
     onOpenChange(val);
   };
 
-  if (!service) return null;
+  if (!serviceGroup) return null;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="glass bg-slate-900/90 border-white/10 text-white sm:max-w-md">
+      <DialogContent className="glass bg-slate-900 border-white/10 text-white sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-primary flex items-center gap-2">
-            {success ? (
-              <>
-                <CheckCircle2 className="w-6 h-6 text-green-500" />
-                <span>تم استلام طلبك!</span>
-              </>
-            ) : (
-              <span>طلب خدمة: {service.name}</span>
-            )}
+          <DialogTitle className="text-2xl font-bold text-orange-500 text-center">
+            {serviceGroup.name}
           </DialogTitle>
         </DialogHeader>
 
@@ -109,10 +112,10 @@ export function OrderModal({ service, open, onOpenChange }: OrderModalProps) {
               تم إرسال طلبك بنجاح وسيتم تنفيذه في أقرب وقت. يمكنك متابعة حالة الطلب من قائمة "طلباتي".
             </p>
             
-            {settings?.adminWhatsapp && (
+            {settings?.adminWhatsapp && selectedService && (
               <Button 
                 onClick={() => {
-                  const message = `تأكيد طلب من ويب ستور\n------------------\nالخدمة: ${service.name}\nالمعرف: ${form.getValues().userInputId || 'تم الإرسال مسبقاً'}\nالسعر: ${service.price} ر.ي\nاسم العميل: ${user?.fullName}\nرقم الهاتف: ${user?.phoneNumber}`;
+                  const message = `تأكيد طلب من ويب ستور\n------------------\nالخدمة: ${selectedService.name}\nالمعرف: ${form.getValues().userInputId || 'تم الإرسال مسبقاً'}\nالسعر: ${selectedService.price} ر.ي\nاسم العميل: ${user?.fullName}\nرقم الهاتف: ${user?.phoneNumber}`;
                   const whatsappUrl = `https://wa.me/${settings.adminWhatsapp.replace(/\+/g, '')}?text=${encodeURIComponent(message)}`;
                   window.open(whatsappUrl, '_blank');
                 }} 
@@ -128,66 +131,85 @@ export function OrderModal({ service, open, onOpenChange }: OrderModalProps) {
             </Button>
           </div>
         ) : (
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pt-4">
-              
-              <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 flex items-start gap-3">
-                <Info className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <p className="font-semibold text-primary text-sm">تفاصيل الخدمة</p>
-                  <p className="text-sm text-gray-300 leading-relaxed">
-                    {service.note || "سيتم شحن الحساب فور التحقق من عملية الدفع."}
-                  </p>
+          <div className="space-y-6 pt-4">
+            {/* Instruction */}
+            <div className="bg-slate-800/50 border border-blue-900/50 rounded-xl p-4 flex items-center justify-between">
+              <span className="text-gray-200 font-medium">
+                {isAuthInput ? "الشحن عن طريق الحساب" : "الشحن عن طريق الآيدي"}
+              </span>
+              <Info className="w-5 h-5 text-blue-400" />
+            </div>
+
+            {/* Price Tiers List */}
+            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/10">
+              {groupServices.map((s) => (
+                <div 
+                  key={s.id}
+                  onClick={() => setSelectedService(s)}
+                  className={`relative p-4 rounded-xl cursor-pointer border-2 transition-all duration-200 ${
+                    selectedService?.id === s.id 
+                      ? 'bg-slate-800 border-orange-500' 
+                      : 'bg-slate-800/30 border-white/5 hover:border-white/10'
+                  }`}
+                >
+                  {selectedService?.id === s.id && (
+                    <div className="absolute right-0 top-0 bottom-0 w-1 bg-orange-500 rounded-l-full" />
+                  )}
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-white text-lg">{s.name}</span>
+                    <span className="font-bold text-orange-500 text-lg">{s.price} ريال</span>
+                  </div>
                 </div>
-              </div>
+              ))}
+            </div>
 
-              <div className="bg-white/5 rounded-xl p-4 border border-white/5 flex justify-between items-center">
-                <span className="text-gray-400">السعر المطلوب</span>
-                <span className="text-xl font-bold text-teal-400">{service.price} ر.ي</span>
-              </div>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <FormField
+                  control={form.control}
+                  name="userInputId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-gray-300 font-bold">
+                        {isAuthInput ? "البريد الإلكتروني وكلمة المرور" : "الآيدي أو الرقم"}
+                      </FormLabel>
+                      <FormControl>
+                        {isAuthInput ? (
+                          <textarea
+                            placeholder="أدخل تفاصيل الحساب هنا..."
+                            {...field}
+                            className="w-full bg-slate-800 border border-white/10 rounded-xl text-white placeholder:text-gray-600 focus:border-orange-500 p-3 min-h-[80px] outline-none"
+                          />
+                        ) : (
+                          <Input 
+                            placeholder="أدخل الآيدي الخاص بك هنا" 
+                            {...field} 
+                            className="bg-slate-800 border-white/10 text-white placeholder:text-gray-600 focus:border-orange-500 h-12"
+                          />
+                        )}
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={form.control}
-                name="userInputId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{isAuthInput ? "البريد الإلكتروني وكلمة المرور" : "الآيدي / الرقم / المعرف"}</FormLabel>
-                    <FormControl>
-                      {isAuthInput ? (
-                        <textarea
-                          placeholder="مثلاً:&#10;example@mail.com&#10;password123"
-                          {...field}
-                          className="w-full bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-gray-500 focus:border-primary p-3 min-h-[100px] outline-none"
-                        />
-                      ) : (
-                        <Input 
-                          placeholder="أدخل المعرف الخاص بك هنا..." 
-                          {...field} 
-                          className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-primary h-12"
-                        />
-                      )}
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <Button 
-                type="submit" 
-                className="w-full h-12 text-lg font-bold bg-gradient-to-r from-primary to-orange-600 hover:from-orange-600 hover:to-primary transition-all duration-300 shadow-lg shadow-primary/20"
-                disabled={isPending}
-              >
-                {isPending ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin ml-2" />
-                    جاري الإرسال...
-                  </>
-                ) : (
-                  "تأكيد الطلب"
-                )}
-              </Button>
-            </form>
-          </Form>
+                <Button 
+                  type="submit" 
+                  className="w-full h-14 text-xl font-bold bg-orange-500 hover:bg-orange-600 transition-all rounded-xl shadow-lg shadow-orange-500/20 gap-2"
+                  disabled={isPending || !selectedService}
+                >
+                  {isPending ? (
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  ) : (
+                    <>
+                      <MessageSquare className="w-5 h-5 -scale-x-100" />
+                      تأكيد الطلب
+                    </>
+                  )}
+                </Button>
+              </form>
+            </Form>
+          </div>
         )}
       </DialogContent>
     </Dialog>
