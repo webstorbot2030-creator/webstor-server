@@ -136,13 +136,13 @@ export async function registerRoutes(
 async function seedDatabase() {
   const existingCategories = await storage.getCategories();
   if (existingCategories.length === 0) {
-    // 1. Categories (from Excel)
-    const catGames = await storage.createCategory({ name: "ألعاب", icon: "gamepad-2" });
-    const catApps = await storage.createCategory({ name: "تطبيقات", icon: "layout-grid" });
-    const catSubs = await storage.createCategory({ name: "اشتراكات", icon: "tv" });
-    const catCards = await storage.createCategory({ name: "بطاقات", icon: "credit-card" });
+    // 1. Categories
+    const catApps = await storage.createCategory({ name: "قسم التطبيقات", icon: "layout-grid" });
+    const catGames = await storage.createCategory({ name: "قسم الألعاب", icon: "gamepad-2" });
+    const catSubs = await storage.createCategory({ name: "قسم الاشتراكات", icon: "tv" });
+    const catCards = await storage.createCategory({ name: "قسم البطائق", icon: "credit-card" });
 
-    // 2. Applications (Lama Ludo from message)
+    // 2. Lama Ludo
     const lamaGroup = await storage.createServiceGroup({
       name: "لاما لودو Lama Ludo",
       categoryId: catApps.id,
@@ -166,7 +166,7 @@ async function seedDatabase() {
       await storage.createService({ name: item.n, price: item.p, serviceGroupId: lamaGroup.id, active: true });
     }
 
-    // 3. Games (PUBG from message)
+    // 3. PUBG
     const pubgGroup = await storage.createServiceGroup({
       name: "بوبجي موبايل العالمية",
       categoryId: catGames.id,
@@ -192,7 +192,7 @@ async function seedDatabase() {
       await storage.createService({ name: item.n, price: item.p, serviceGroupId: pubgGroup.id, active: true });
     }
 
-    // 4. Subscriptions (Shahid from message)
+    // 4. Shahid
     const shahidGroup = await storage.createServiceGroup({
       name: "شاهد في اي بي Shahid VIP",
       categoryId: catSubs.id,
@@ -202,7 +202,7 @@ async function seedDatabase() {
     await storage.createService({ name: "شاهد VIP – 3 أشهر", price: 15500, serviceGroupId: shahidGroup.id, active: true });
     await storage.createService({ name: "شاهد VIP – سنة كاملة", price: 50000, serviceGroupId: shahidGroup.id, active: true });
 
-    // 5. Cards (iTunes from message)
+    // 5. iTunes
     const itunesGroup = await storage.createServiceGroup({
       name: "بطاقات آيتونز امريكي",
       categoryId: catCards.id,
