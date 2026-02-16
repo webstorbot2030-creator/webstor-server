@@ -3,6 +3,7 @@ import {
   users, categories, serviceGroups, services, orders, banks, ads, settings,
   accounts, funds, accountingPeriods, journalEntries, journalLines, fundTransactions,
   apiProviders, apiServiceMappings, apiOrderLogs, apiTokens, notifications,
+  passwordResetCodes, adminActivityLogs,
   type User, type InsertUser,
   type Category, type InsertCategory,
   type ServiceGroup, type InsertServiceGroup,
@@ -22,6 +23,8 @@ import {
   type ApiOrderLog, type InsertApiOrderLog,
   type ApiToken, type InsertApiToken,
   type Notification, type InsertNotification,
+  type PasswordResetCode, type InsertPasswordResetCode,
+  type AdminActivityLog, type InsertAdminActivityLog,
 } from "@shared/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 
@@ -162,6 +165,20 @@ export interface IStorage {
 
   // Order Reports
   getOrderReports(filters?: { status?: string; fromDate?: string; toDate?: string; userId?: number; serviceGroupId?: number }): Promise<any>;
+
+  // Password Reset
+  getUserByEmail(email: string): Promise<User | undefined>;
+  createPasswordResetCode(data: InsertPasswordResetCode): Promise<PasswordResetCode>;
+  getValidResetCode(userId: number, code: string): Promise<PasswordResetCode | undefined>;
+  markResetCodeUsed(id: number): Promise<void>;
+  updateUserPassword(id: number, hashedPassword: string): Promise<User>;
+
+  // Admin Activity Logs
+  getAdminActivityLogs(limit?: number): Promise<(AdminActivityLog & { user?: User })[]>;
+  createAdminActivityLog(log: InsertAdminActivityLog): Promise<AdminActivityLog>;
+
+  // Dashboard Stats
+  getDashboardStats(): Promise<{ totalUsers: number; totalOrders: number; todayOrders: number; totalRevenue: number; pendingOrders: number; completedOrders: number; newUsersToday: number }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -747,6 +764,74 @@ export class DatabaseStorage implements IStorage {
       ORDER BY a.code
     `);
     return result.rows as any;
+  }
+
+  // === Password Reset ===
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
+  }
+
+  async createPasswordResetCode(data: InsertPasswordResetCode): Promise<PasswordResetCode> {
+    const [code] = await db.insert(passwordResetCodes).values(data).returning();
+    return code;
+  }
+
+  async getValidResetCode(userId: number, code: string): Promise<PasswordResetCode | undefined> {
+    const [result] = await db.select().from(passwordResetCodes)
+      .where(and(
+        eq(passwordResetCodes.userId, userId),
+        eq(passwordResetCodes.code, code),
+        eq(passwordResetCodes.used, false),
+        sql`${passwordResetCodes.expiresAt} > NOW()`
+      ));
+    return result;
+  }
+
+  async markResetCodeUsed(id: number): Promise<void> {
+    await db.update(passwordResetCodes).set({ used: true }).where(eq(passwordResetCodes.id, id));
+  }
+
+  async updateUserPassword(id: number, hashedPassword: string): Promise<User> {
+    const [user] = await db.update(users).set({ password: hashedPassword }).where(eq(users.id, id)).returning();
+    return user;
+  }
+
+  // === Admin Activity Logs ===
+  async getAdminActivityLogs(limit = 100): Promise<(AdminActivityLog & { user?: User })[]> {
+    const logs = await db.select().from(adminActivityLogs).orderBy(desc(adminActivityLogs.createdAt)).limit(limit);
+    const result = [];
+    for (const log of logs) {
+      const [user] = await db.select().from(users).where(eq(users.id, log.userId));
+      result.push({ ...log, user });
+    }
+    return result;
+  }
+
+  async createAdminActivityLog(log: InsertAdminActivityLog): Promise<AdminActivityLog> {
+    const [entry] = await db.insert(adminActivityLogs).values(log).returning();
+    return entry;
+  }
+
+  // === Dashboard Stats ===
+  async getDashboardStats(): Promise<{ totalUsers: number; totalOrders: number; todayOrders: number; totalRevenue: number; pendingOrders: number; completedOrders: number; newUsersToday: number }> {
+    const totalUsersResult = await db.execute(sql`SELECT COUNT(*) as count FROM users WHERE role = 'user'`);
+    const totalOrdersResult = await db.execute(sql`SELECT COUNT(*) as count FROM orders`);
+    const todayOrdersResult = await db.execute(sql`SELECT COUNT(*) as count FROM orders WHERE created_at >= CURRENT_DATE`);
+    const revenueResult = await db.execute(sql`SELECT COALESCE(SUM(s.price), 0) as total FROM orders o JOIN services s ON o.service_id = s.id WHERE o.status = 'completed'`);
+    const pendingResult = await db.execute(sql`SELECT COUNT(*) as count FROM orders WHERE status = 'pending'`);
+    const completedResult = await db.execute(sql`SELECT COUNT(*) as count FROM orders WHERE status = 'completed'`);
+    const newUsersResult = await db.execute(sql`SELECT COUNT(*) as count FROM users WHERE created_at >= CURRENT_DATE AND role = 'user'`);
+
+    return {
+      totalUsers: Number(totalUsersResult.rows[0]?.count || 0),
+      totalOrders: Number(totalOrdersResult.rows[0]?.count || 0),
+      todayOrders: Number(todayOrdersResult.rows[0]?.count || 0),
+      totalRevenue: Number(revenueResult.rows[0]?.total || 0),
+      pendingOrders: Number(pendingResult.rows[0]?.count || 0),
+      completedOrders: Number(completedResult.rows[0]?.count || 0),
+      newUsersToday: Number(newUsersResult.rows[0]?.count || 0),
+    };
   }
 }
 

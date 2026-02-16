@@ -9,10 +9,31 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   fullName: text("full_name").notNull(),
   phoneNumber: text("phone_number").notNull().unique(),
+  email: text("email"),
   password: text("password").notNull(),
   role: text("role").notNull().default("user"),
   balance: integer("balance").default(0),
   active: boolean("active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const passwordResetCodes = pgTable("password_reset_codes", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  code: text("code").notNull(),
+  method: text("method").notNull().default("whatsapp"),
+  expiresAt: timestamp("expires_at").notNull(),
+  used: boolean("used").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const adminActivityLogs = pgTable("admin_activity_logs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  action: text("action").notNull(),
+  details: text("details"),
+  targetType: text("target_type"),
+  targetId: integer("target_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -387,6 +408,16 @@ export type ApiOrderLog = typeof apiOrderLogs.$inferSelect;
 export type InsertApiOrderLog = z.infer<typeof insertApiOrderLogSchema>;
 export type ApiToken = typeof apiTokens.$inferSelect;
 export type InsertApiToken = z.infer<typeof insertApiTokenSchema>;
+
+// Password reset schemas
+export const insertPasswordResetCodeSchema = createInsertSchema(passwordResetCodes).omit({ id: true, createdAt: true });
+export type PasswordResetCode = typeof passwordResetCodes.$inferSelect;
+export type InsertPasswordResetCode = z.infer<typeof insertPasswordResetCodeSchema>;
+
+// Admin activity log schemas
+export const insertAdminActivityLogSchema = createInsertSchema(adminActivityLogs).omit({ id: true, createdAt: true });
+export type AdminActivityLog = typeof adminActivityLogs.$inferSelect;
+export type InsertAdminActivityLog = z.infer<typeof insertAdminActivityLogSchema>;
 
 // Request types
 export type LoginRequest = { phoneNumber: string; password: string };

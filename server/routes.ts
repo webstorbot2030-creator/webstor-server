@@ -102,6 +102,18 @@ export async function registerRoutes(
   app.post(api.orders.create.path, async (req, res) => {
     if (!req.user) return res.sendStatus(401);
     const orderData = api.orders.create.input.parse(req.body);
+    const payWithBalance = req.body.payWithBalance === true;
+
+    if (payWithBalance) {
+      const service = await storage.getService(orderData.serviceId);
+      if (!service) return res.status(404).json({ message: "الخدمة غير موجودة" });
+      const user = await storage.getUser(req.user.id);
+      if (!user || (user.balance || 0) < service.price) {
+        return res.status(400).json({ message: "رصيدك غير كافي. رصيدك الحالي: " + ((user?.balance || 0).toLocaleString()) + " ر.ي" });
+      }
+      await storage.updateUserBalance(req.user.id, (user.balance || 0) - service.price);
+    }
+
     const order = await storage.createOrder({
       ...orderData,
       userId: req.user.id,
@@ -280,6 +292,33 @@ export async function registerRoutes(
     if (req.user?.role !== "admin") return res.sendStatus(403);
     const users = await storage.getAllUsers();
     res.json(users.map(u => ({ ...u, password: undefined })));
+  });
+
+  app.post("/api/admin/users/:id/add-balance", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const userId = Number(req.params.id);
+    const amount = Number(req.body.amount);
+    if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ message: "المبلغ غير صحيح" });
+    const user = await storage.getUser(userId);
+    if (!user) return res.status(404).json({ message: "المستخدم غير موجود" });
+    const newBalance = (user.balance || 0) + Number(amount);
+    const updated = await storage.updateUserBalance(userId, newBalance);
+    try {
+      await storage.createNotification({
+        userId: userId,
+        type: "success",
+        title: "تم شحن رصيدك",
+        message: `تم إضافة ${Number(amount).toLocaleString()} ر.ي إلى رصيدك. رصيدك الحالي: ${newBalance.toLocaleString()} ر.ي`,
+      });
+      await storage.createAdminActivityLog({
+        userId: req.user.id,
+        action: "شحن رصيد",
+        details: `شحن ${amount} ر.ي للمستخدم ${user.fullName}`,
+        targetType: "user",
+        targetId: userId,
+      });
+    } catch (e) { console.error(e); }
+    res.json(updated);
   });
 
   app.patch("/api/admin/users/:id", async (req, res) => {
@@ -593,6 +632,21 @@ export async function registerRoutes(
     };
     const report = await storage.getOrderReports(filters);
     res.json(report);
+  });
+
+  // === Dashboard Stats ===
+  app.get("/api/admin/dashboard-stats", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const stats = await storage.getDashboardStats();
+    res.json(stats);
+  });
+
+  // === Admin Activity Logs ===
+  app.get("/api/admin/activity-logs", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const limit = req.query.limit ? Number(req.query.limit) : 100;
+    const logs = await storage.getAdminActivityLogs(limit);
+    res.json(logs);
   });
 
   // === Accounting: Accounts (Chart of Accounts) ===
