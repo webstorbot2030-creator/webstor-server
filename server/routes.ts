@@ -30,6 +30,24 @@ export async function registerRoutes(
     res.sendStatus(204);
   });
 
+  // === Service Groups ===
+  app.get("/api/service-groups", async (req, res) => {
+    const groups = await storage.getServiceGroups();
+    res.json(groups);
+  });
+
+  app.post("/api/service-groups", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const group = await storage.createServiceGroup(req.body);
+    res.status(201).json(group);
+  });
+
+  app.delete("/api/service-groups/:id", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    await storage.deleteServiceGroup(Number(req.params.id));
+    res.sendStatus(204);
+  });
+
   // === Services ===
   app.get(api.services.list.path, async (req, res) => {
     const services = await storage.getServices();
@@ -241,7 +259,7 @@ async function seedDatabase() {
     await storage.updateSettings({
       storeName: "ويب ستور",
       logoUrl: "/logo.png",
-      adminWhatsapp: "967700000000"
+      adminWhatsapp: "967775477340"
     });
     console.log("Seeding completed.");
   }
