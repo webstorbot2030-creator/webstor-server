@@ -44,6 +44,10 @@ export default function AdminPage() {
               <Wallet className="w-5 h-5" />
               <span>النظام المحاسبي</span>
             </Button>
+            <Button onClick={() => setLocation("/api-integration")} variant="ghost" className="justify-start gap-3 text-violet-400 hover:text-violet-300 hover:bg-violet-500/10 rounded-xl h-12" data-testid="link-api-integration">
+              <ExternalLink className="w-5 h-5" />
+              <span>ربط API</span>
+            </Button>
             <Button onClick={() => setLocation("/")} variant="ghost" className="justify-start gap-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl h-12">
               <ExternalLink className="w-5 h-5" />
               <span>العودة للمتجر</span>

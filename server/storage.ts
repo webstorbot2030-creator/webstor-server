@@ -2,6 +2,7 @@ import { db } from "./db";
 import {
   users, categories, serviceGroups, services, orders, banks, ads, settings,
   accounts, funds, accountingPeriods, journalEntries, journalLines, fundTransactions,
+  apiProviders, apiServiceMappings, apiOrderLogs, apiTokens,
   type User, type InsertUser,
   type Category, type InsertCategory,
   type ServiceGroup, type InsertServiceGroup,
@@ -16,6 +17,10 @@ import {
   type JournalEntry, type InsertJournalEntry,
   type JournalLine, type InsertJournalLine,
   type FundTransaction, type InsertFundTransaction,
+  type ApiProvider, type InsertApiProvider,
+  type ApiServiceMapping, type InsertApiServiceMapping,
+  type ApiOrderLog, type InsertApiOrderLog,
+  type ApiToken, type InsertApiToken,
 } from "@shared/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 
@@ -115,6 +120,33 @@ export interface IStorage {
   // Reports
   getAccountBalances(periodId?: number): Promise<{ accountId: number; code: string; nameAr: string; type: string; totalDebit: string; totalCredit: string; balance: string }[]>;
   getTrialBalance(periodId?: number): Promise<{ accountId: number; code: string; nameAr: string; type: string; debit: string; credit: string }[]>;
+
+  // API Providers
+  getApiProviders(): Promise<ApiProvider[]>;
+  getApiProvider(id: number): Promise<ApiProvider | undefined>;
+  createApiProvider(provider: InsertApiProvider): Promise<ApiProvider>;
+  updateApiProvider(id: number, data: Partial<ApiProvider>): Promise<ApiProvider>;
+  deleteApiProvider(id: number): Promise<void>;
+
+  // API Service Mappings
+  getApiServiceMappings(providerId?: number): Promise<ApiServiceMapping[]>;
+  getApiServiceMapping(id: number): Promise<ApiServiceMapping | undefined>;
+  getApiServiceMappingByLocalService(localServiceId: number): Promise<(ApiServiceMapping & { provider?: ApiProvider })[]>;
+  createApiServiceMapping(mapping: InsertApiServiceMapping): Promise<ApiServiceMapping>;
+  updateApiServiceMapping(id: number, data: Partial<ApiServiceMapping>): Promise<ApiServiceMapping>;
+  deleteApiServiceMapping(id: number): Promise<void>;
+
+  // API Order Logs
+  getApiOrderLogs(providerId?: number, orderId?: number): Promise<ApiOrderLog[]>;
+  createApiOrderLog(log: InsertApiOrderLog): Promise<ApiOrderLog>;
+  updateApiOrderLog(id: number, data: Partial<ApiOrderLog>): Promise<ApiOrderLog>;
+
+  // API Tokens
+  getApiTokens(): Promise<ApiToken[]>;
+  getApiTokenByToken(token: string): Promise<(ApiToken & { user?: User }) | undefined>;
+  createApiToken(token: InsertApiToken): Promise<ApiToken>;
+  updateApiToken(id: number, data: Partial<ApiToken>): Promise<ApiToken>;
+  deleteApiToken(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -451,6 +483,113 @@ export class DatabaseStorage implements IStorage {
   async createFundTransaction(transaction: InsertFundTransaction): Promise<FundTransaction> {
     const [created] = await db.insert(fundTransactions).values(transaction).returning();
     return created;
+  }
+
+  // === API Providers ===
+  async getApiProviders(): Promise<ApiProvider[]> {
+    return await db.select().from(apiProviders).orderBy(desc(apiProviders.createdAt));
+  }
+
+  async getApiProvider(id: number): Promise<ApiProvider | undefined> {
+    const [provider] = await db.select().from(apiProviders).where(eq(apiProviders.id, id));
+    return provider;
+  }
+
+  async createApiProvider(provider: InsertApiProvider): Promise<ApiProvider> {
+    const [created] = await db.insert(apiProviders).values(provider).returning();
+    return created;
+  }
+
+  async updateApiProvider(id: number, data: Partial<ApiProvider>): Promise<ApiProvider> {
+    const [updated] = await db.update(apiProviders).set(data).where(eq(apiProviders.id, id)).returning();
+    return updated;
+  }
+
+  async deleteApiProvider(id: number): Promise<void> {
+    await db.delete(apiServiceMappings).where(eq(apiServiceMappings.providerId, id));
+    await db.delete(apiProviders).where(eq(apiProviders.id, id));
+  }
+
+  // === API Service Mappings ===
+  async getApiServiceMappings(providerId?: number): Promise<ApiServiceMapping[]> {
+    if (providerId) {
+      return await db.select().from(apiServiceMappings).where(eq(apiServiceMappings.providerId, providerId));
+    }
+    return await db.select().from(apiServiceMappings);
+  }
+
+  async getApiServiceMapping(id: number): Promise<ApiServiceMapping | undefined> {
+    const [mapping] = await db.select().from(apiServiceMappings).where(eq(apiServiceMappings.id, id));
+    return mapping;
+  }
+
+  async getApiServiceMappingByLocalService(localServiceId: number): Promise<(ApiServiceMapping & { provider?: ApiProvider })[]> {
+    return await db.query.apiServiceMappings.findMany({
+      where: and(eq(apiServiceMappings.localServiceId, localServiceId), eq(apiServiceMappings.isActive, true), eq(apiServiceMappings.autoForward, true)),
+      with: { provider: true },
+    }) as any;
+  }
+
+  async createApiServiceMapping(mapping: InsertApiServiceMapping): Promise<ApiServiceMapping> {
+    const [created] = await db.insert(apiServiceMappings).values(mapping).returning();
+    return created;
+  }
+
+  async updateApiServiceMapping(id: number, data: Partial<ApiServiceMapping>): Promise<ApiServiceMapping> {
+    const [updated] = await db.update(apiServiceMappings).set(data).where(eq(apiServiceMappings.id, id)).returning();
+    return updated;
+  }
+
+  async deleteApiServiceMapping(id: number): Promise<void> {
+    await db.delete(apiServiceMappings).where(eq(apiServiceMappings.id, id));
+  }
+
+  // === API Order Logs ===
+  async getApiOrderLogs(providerId?: number, orderId?: number): Promise<ApiOrderLog[]> {
+    const conditions = [];
+    if (providerId) conditions.push(eq(apiOrderLogs.providerId, providerId));
+    if (orderId) conditions.push(eq(apiOrderLogs.orderId, orderId));
+    if (conditions.length > 0) {
+      return await db.select().from(apiOrderLogs).where(and(...conditions)).orderBy(desc(apiOrderLogs.createdAt));
+    }
+    return await db.select().from(apiOrderLogs).orderBy(desc(apiOrderLogs.createdAt)).limit(100);
+  }
+
+  async createApiOrderLog(log: InsertApiOrderLog): Promise<ApiOrderLog> {
+    const [created] = await db.insert(apiOrderLogs).values(log).returning();
+    return created;
+  }
+
+  async updateApiOrderLog(id: number, data: Partial<ApiOrderLog>): Promise<ApiOrderLog> {
+    const [updated] = await db.update(apiOrderLogs).set(data).where(eq(apiOrderLogs.id, id)).returning();
+    return updated;
+  }
+
+  // === API Tokens ===
+  async getApiTokens(): Promise<ApiToken[]> {
+    return await db.select().from(apiTokens).orderBy(desc(apiTokens.createdAt));
+  }
+
+  async getApiTokenByToken(token: string): Promise<(ApiToken & { user?: User }) | undefined> {
+    const result = await db.query.apiTokens.findFirst({
+      where: and(eq(apiTokens.token, token), eq(apiTokens.isActive, true)),
+      with: { user: true },
+    });
+    return result as any;
+  }
+
+  async createApiToken(tokenData: InsertApiToken): Promise<ApiToken> {
+    const [created] = await db.insert(apiTokens).values(tokenData).returning();
+    return created;
+  }
+
+  async updateApiToken(id: number, data: Partial<ApiToken>): Promise<ApiToken> {
+    const [updated] = await db.update(apiTokens).set(data).where(eq(apiTokens.id, id)).returning();
+    return updated;
+  }
+
+  async deleteApiToken(id: number): Promise<void> {
+    await db.delete(apiTokens).where(eq(apiTokens.id, id));
   }
 
   // === Reports ===
