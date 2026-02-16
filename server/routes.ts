@@ -126,26 +126,41 @@ export async function registerRoutes(
   app.post(api.orders.create.path, async (req, res) => {
     if (!req.user) return res.sendStatus(401);
     const orderData = api.orders.create.input.parse(req.body);
-    const payWithBalance = req.body.payWithBalance === true;
 
-    if (payWithBalance) {
-      const service = await storage.getService(orderData.serviceId);
-      if (!service) return res.status(404).json({ message: "الخدمة غير موجودة" });
-      const user = await storage.getUser(req.user.id);
-      if (!user || (user.balance || 0) < service.price) {
-        return res.status(400).json({ message: "رصيدك غير كافي. رصيدك الحالي: " + ((user?.balance || 0).toLocaleString()) + " ر.ي" });
-      }
-      await storage.updateUserBalance(req.user.id, (user.balance || 0) - service.price);
+    const service = await storage.getService(orderData.serviceId);
+    if (!service) return res.status(404).json({ message: "الخدمة غير موجودة" });
+
+    let finalPrice = service.price;
+    const user = await storage.getUser(req.user.id);
+    if (!user) return res.status(404).json({ message: "المستخدم غير موجود" });
+
+    if (user.vipGroupId) {
+      try {
+        const vipGroups = await storage.getVipGroups();
+        const userVipGroup = vipGroups.find(g => g.id === user.vipGroupId);
+        if (userVipGroup) {
+          const vipDiscounts = await storage.getVipServiceDiscounts(userVipGroup.id);
+          const serviceDiscount = vipDiscounts.find((d: any) => d.serviceId === service.id);
+          const discountPercent = serviceDiscount ? serviceDiscount.discountPercent : userVipGroup.discountPercent;
+          finalPrice = Math.round(service.price * (1 - discountPercent / 100));
+        }
+      } catch (e) {}
     }
+
+    if ((user.balance || 0) < finalPrice) {
+      return res.status(400).json({ message: "رصيدك غير كافي. رصيدك الحالي: " + ((user.balance || 0).toLocaleString()) + " ر.ي، وسعر الخدمة: " + finalPrice.toLocaleString() + " ر.ي" });
+    }
+
+    await storage.updateUserBalance(req.user.id, (user.balance || 0) - finalPrice);
 
     const order = await storage.createOrder({
       ...orderData,
       userId: req.user.id,
-      status: "pending"
+      status: "pending",
+      paidAmount: finalPrice
     });
 
     try {
-      const service = await storage.getService(orderData.serviceId);
       const allUsers = await storage.getAllUsers();
       const admins = allUsers.filter(u => u.role === "admin");
       for (const admin of admins) {
@@ -210,17 +225,17 @@ export async function registerRoutes(
 
     if (status === "pending" && previousStatus === "rejected") {
       try {
-        const service = await storage.getService(order.serviceId);
-        if (service) {
+        const reDeductAmount = order.paidAmount || 0;
+        if (reDeductAmount > 0) {
           const user = await storage.getUser(order.userId);
           if (user) {
-            const newBalance = (user.balance || 0) - service.price;
+            const newBalance = (user.balance || 0) - reDeductAmount;
             await storage.updateUserBalance(order.userId, newBalance);
             await storage.createNotification({
               userId: order.userId,
               type: "info",
               title: "تم خصم الرصيد",
-              message: `تم خصم ${service.price.toLocaleString()} ر.ي من رصيدك لإعادة معالجة الطلب #${order.id}. رصيدك الحالي: ${newBalance.toLocaleString()} ر.ي`,
+              message: `تم خصم ${reDeductAmount.toLocaleString()} ر.ي من رصيدك لإعادة معالجة الطلب #${order.id}. رصيدك الحالي: ${newBalance.toLocaleString()} ر.ي`,
             });
           }
         }
@@ -231,17 +246,17 @@ export async function registerRoutes(
 
     if (status === "rejected") {
       try {
-        const service = await storage.getService(order.serviceId);
-        if (service) {
+        const refundAmount = order.paidAmount || 0;
+        if (refundAmount > 0) {
           const user = await storage.getUser(order.userId);
           if (user) {
-            const newBalance = (user.balance || 0) + service.price;
+            const newBalance = (user.balance || 0) + refundAmount;
             await storage.updateUserBalance(order.userId, newBalance);
             await storage.createNotification({
               userId: order.userId,
               type: "success",
               title: "تم استرداد رصيدك",
-              message: `تم إرجاع ${service.price.toLocaleString()} ر.ي إلى رصيدك بسبب رفض الطلب #${order.id}. رصيدك الحالي: ${newBalance.toLocaleString()} ر.ي`,
+              message: `تم إرجاع ${refundAmount.toLocaleString()} ر.ي إلى رصيدك بسبب رفض الطلب #${order.id}. رصيدك الحالي: ${newBalance.toLocaleString()} ر.ي`,
             });
           }
         }

@@ -13,7 +13,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useSettings, useServiceGroups, useServices } from "@/hooks/use-store";
-import { Checkbox } from "@/components/ui/checkbox";
 
 const orderSchema = z.object({
   userInputId: z.string().min(1, "هذا الحقل مطلوب"),
@@ -35,7 +34,7 @@ export function OrderModal({ serviceGroup, open, onOpenChange }: OrderModalProps
   const { data: services } = useServices();
   
   const [selectedService, setSelectedService] = useState<Service | null>(null);
-  const [payWithBalance, setPayWithBalance] = useState(false);
+
 
   const isAuthInput = serviceGroup?.inputType === 'auth';
   const groupServices = services?.filter((s: any) => s.serviceGroupId === serviceGroup?.id) || [];
@@ -68,17 +67,24 @@ export function OrderModal({ serviceGroup, open, onOpenChange }: OrderModalProps
     }
 
     createOrder(
-      { serviceId: selectedService.id, userInputId: data.userInputId, payWithBalance },
+      { serviceId: selectedService.id, userInputId: data.userInputId },
       {
         onSuccess: () => {
           setSuccess(true);
           form.reset();
           
           if (settings?.adminWhatsapp) {
-            const message = `🛒 طلب جديد من ويب ستور\n══════════════════\n📦 القسم: ${serviceGroup!.name}\n🎮 الخدمة: ${selectedService.name}\n🆔 المعرف: ${data.userInputId}\n💰 السعر: ${selectedService.price.toLocaleString()} ر.ي\n══════════════════\n👤 اسم العميل: ${user.fullName}\n${user.phoneNumber ? '📱 رقم الهاتف: ' + user.phoneNumber : '📧 البريد: ' + ((user as any).email || '')}\n${payWithBalance ? '✅ تم الدفع من الرصيد' : '⏳ بانتظار الدفع'}`;
+            const message = `🛒 طلب جديد من ويب ستور\n══════════════════\n📦 القسم: ${serviceGroup!.name}\n🎮 الخدمة: ${selectedService.name}\n🆔 المعرف: ${data.userInputId}\n💰 السعر: ${selectedService.price.toLocaleString()} ر.ي\n══════════════════\n👤 اسم العميل: ${user.fullName}\n${user.phoneNumber ? '📱 رقم الهاتف: ' + user.phoneNumber : '📧 البريد: ' + ((user as any).email || '')}\n✅ تم الخصم من الرصيد`;
             const whatsappUrl = `https://wa.me/${settings.adminWhatsapp.replace(/\+/g, '')}?text=${encodeURIComponent(message)}`;
             window.open(whatsappUrl, '_blank');
           }
+        },
+        onError: (error: any) => {
+          toast({
+            title: "فشل تقديم الطلب",
+            description: error.message || "رصيدك غير كافي",
+            variant: "destructive",
+          });
         },
       }
     );
@@ -89,7 +95,6 @@ export function OrderModal({ serviceGroup, open, onOpenChange }: OrderModalProps
       setTimeout(() => {
         setSuccess(false);
         setSelectedService(null);
-        setPayWithBalance(false);
       }, 300);
     }
     onOpenChange(val);
@@ -194,19 +199,21 @@ export function OrderModal({ serviceGroup, open, onOpenChange }: OrderModalProps
                   )}
                 />
 
-                {user && selectedService && (user.balance || 0) >= selectedService.price && (
-                  <div className="flex items-center gap-3 bg-green-500/10 border border-green-500/20 rounded-xl p-4">
-                    <Checkbox 
-                      id="payWithBalance" 
-                      checked={payWithBalance} 
-                      onCheckedChange={(v) => setPayWithBalance(v === true)}
-                      className="border-green-500 data-[state=checked]:bg-green-500"
-                      data-testid="checkbox-pay-balance"
-                    />
-                    <label htmlFor="payWithBalance" className="text-sm text-green-700 dark:text-green-300 cursor-pointer flex items-center gap-2">
-                      <Wallet className="w-4 h-4" />
-                      الدفع من الرصيد ({(user.balance || 0).toLocaleString()} ر.ي)
-                    </label>
+                {user && selectedService && (
+                  <div className={`flex items-center gap-3 rounded-xl p-4 ${
+                    (user.balance || 0) >= selectedService.price 
+                      ? 'bg-green-500/10 border border-green-500/20' 
+                      : 'bg-red-500/10 border border-red-500/20'
+                  }`}>
+                    <Wallet className={`w-5 h-5 ${(user.balance || 0) >= selectedService.price ? 'text-green-500' : 'text-red-500'}`} />
+                    <div className="flex-1">
+                      <p className={`text-sm font-medium ${(user.balance || 0) >= selectedService.price ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
+                        رصيدك: {(user.balance || 0).toLocaleString()} ر.ي
+                      </p>
+                      {(user.balance || 0) < selectedService.price && (
+                        <p className="text-xs text-red-600 dark:text-red-400 mt-1">رصيدك غير كافي لإتمام هذا الطلب</p>
+                      )}
+                    </div>
                   </div>
                 )}
 

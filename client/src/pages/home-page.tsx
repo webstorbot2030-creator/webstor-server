@@ -123,9 +123,9 @@ export default function HomePage() {
                   </p>
                 </div>
 
-                <div className="w-20 h-20 rounded-2xl dark:bg-gradient-to-br dark:from-white/10 dark:to-white/5 bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center text-4xl shadow-inner group-hover:scale-110 transition-transform duration-300">
-                  {group.image?.startsWith('http') ? (
-                    <img src={group.image} alt={group.name} className="w-full h-full object-cover rounded-2xl" />
+                <div className="w-20 h-20 rounded-2xl dark:bg-gradient-to-br dark:from-white/10 dark:to-white/5 bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center text-4xl shadow-inner group-hover:scale-110 transition-transform duration-300 overflow-hidden">
+                  {group.image && (group.image.startsWith('/') || group.image.startsWith('http')) ? (
+                    <img src={group.image} alt={group.name} className="w-full h-full object-cover" />
                   ) : (
                     <span>{group.image || '💎'}</span>
                   )}

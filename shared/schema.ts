@@ -73,6 +73,7 @@ export const orders = pgTable("orders", {
   status: text("status").notNull().default("pending"), // pending, processing, completed, rejected
   userInputId: text("user_input_id").notNull(), // The ID the user enters for the service
   rejectionReason: text("rejection_reason"),
+  paidAmount: integer("paid_amount"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
