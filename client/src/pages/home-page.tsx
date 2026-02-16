@@ -119,7 +119,7 @@ export default function HomePage() {
                     {group.name}
                   </h3>
                   <p className="text-gray-400 text-sm">
-                    {categories?.find(c => c.id === group.categoryId)?.name || 'قسم الخدمات'}
+                    {categories?.find((c: any) => c.id === group.categoryId)?.name || 'قسم الخدمات'}
                   </p>
                 </div>
 
@@ -146,6 +146,11 @@ export default function HomePage() {
           <div className="flex flex-col items-center gap-4">
             <ShoppingBagIcon className="w-16 h-16 text-primary/50" />
             <h2 className="text-xl font-bold text-primary">ويب ستور</h2>
+            <div className="flex gap-4 text-sm">
+              <a href="/privacy" className="text-primary/70 hover:text-primary transition-colors" data-testid="link-privacy">سياسة الخصوصية</a>
+              <span className="text-gray-600">|</span>
+              <a href="/terms" className="text-primary/70 hover:text-primary transition-colors" data-testid="link-terms">الشروط والأحكام</a>
+            </div>
             <p className="text-gray-400 text-sm">جميع الحقوق محفوظة &copy; 2025 ويب ستور</p>
           </div>
         </footer>

@@ -4,7 +4,8 @@ import { setupAuth, hashPassword } from "./auth";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
-import { insertAccountSchema, insertFundSchema, insertAccountingPeriodSchema } from "@shared/schema";
+import { insertAccountSchema, insertFundSchema, insertAccountingPeriodSchema, insertApiProviderSchema, insertApiServiceMappingSchema } from "@shared/schema";
+import { registerExternalApi, forwardOrderToProvider, generateApiToken } from "./external-api";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -126,6 +127,22 @@ export async function registerRoutes(
     if (req.user?.role !== "admin") return res.sendStatus(403);
     const { status, rejectionReason } = req.body;
     const order = await storage.updateOrderStatus(Number(req.params.id), status, rejectionReason);
+
+    if (status === "processing") {
+      try {
+        const mappings = await storage.getApiServiceMappingByLocalService(order.serviceId);
+        if (mappings && mappings.length > 0) {
+          const result = await forwardOrderToProvider(order.id, order.serviceId, order.userInputId);
+          if (result.success) {
+            console.log(`Order ${order.id} forwarded to provider successfully`);
+          } else {
+            console.warn(`Order ${order.id} forwarding failed: ${result.message}`);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to forward order to provider:", e);
+      }
+    }
 
     if (status === "completed") {
       try {
@@ -272,6 +289,177 @@ export async function registerRoutes(
     if (req.user?.role !== "admin") return res.sendStatus(403);
     const settings = await storage.updateSettings(req.body);
     res.json(settings);
+  });
+
+  // === Register External API (public API for partners) ===
+  registerExternalApi(app);
+
+  // === API Providers Management ===
+  app.get("/api/admin/api-providers", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const providers = await storage.getApiProviders();
+    res.json(providers);
+  });
+
+  app.post("/api/admin/api-providers", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    try {
+      const parsed = insertApiProviderSchema.parse(req.body);
+      const provider = await storage.createApiProvider(parsed);
+      res.status(201).json(provider);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.patch("/api/admin/api-providers/:id", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const provider = await storage.updateApiProvider(Number(req.params.id), req.body);
+    res.json(provider);
+  });
+
+  app.delete("/api/admin/api-providers/:id", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    await storage.deleteApiProvider(Number(req.params.id));
+    res.sendStatus(204);
+  });
+
+  app.post("/api/admin/api-providers/:id/test", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    try {
+      const provider = await storage.getApiProvider(Number(req.params.id));
+      if (!provider) return res.status(404).json({ message: "Provider not found" });
+
+      const formData = new URLSearchParams();
+      formData.append("request", "balance");
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/x-www-form-urlencoded",
+      };
+      if (provider.username && provider.password) {
+        headers["Authorization"] = "Basic " + Buffer.from(`${provider.username}:${provider.password}`).toString("base64");
+      } else if (provider.apiToken) {
+        headers["Authorization"] = `Bearer ${provider.apiToken}`;
+      }
+
+      const response = await fetch(provider.baseUrl, { method: "POST", headers, body: formData });
+      const data = await response.json();
+
+      if (data.status && data.balance !== undefined) {
+        await storage.updateApiProvider(provider.id, { balance: String(data.balance) });
+      }
+
+      res.json({ success: data.status === true, data });
+    } catch (e: any) {
+      res.json({ success: false, error: e.message });
+    }
+  });
+
+  app.post("/api/admin/api-providers/:id/sync-services", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    try {
+      const provider = await storage.getApiProvider(Number(req.params.id));
+      if (!provider) return res.status(404).json({ message: "Provider not found" });
+
+      const formData = new URLSearchParams();
+      formData.append("request", "servicelist");
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/x-www-form-urlencoded",
+      };
+      if (provider.username && provider.password) {
+        headers["Authorization"] = "Basic " + Buffer.from(`${provider.username}:${provider.password}`).toString("base64");
+      } else if (provider.apiToken) {
+        headers["Authorization"] = `Bearer ${provider.apiToken}`;
+      }
+
+      const response = await fetch(provider.baseUrl, { method: "POST", headers, body: formData });
+      const data = await response.json();
+
+      if (data.status && data.ServiceList) {
+        res.json({ success: true, services: data.ServiceList });
+      } else {
+        res.json({ success: false, message: data.message || "Failed to fetch services" });
+      }
+    } catch (e: any) {
+      res.json({ success: false, error: e.message });
+    }
+  });
+
+  // === API Service Mappings ===
+  app.get("/api/admin/api-mappings", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const providerId = req.query.providerId ? Number(req.query.providerId) : undefined;
+    const mappings = await storage.getApiServiceMappings(providerId);
+    res.json(mappings);
+  });
+
+  app.post("/api/admin/api-mappings", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    try {
+      const parsed = insertApiServiceMappingSchema.parse(req.body);
+      const mapping = await storage.createApiServiceMapping(parsed);
+      res.status(201).json(mapping);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.patch("/api/admin/api-mappings/:id", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const mapping = await storage.updateApiServiceMapping(Number(req.params.id), req.body);
+    res.json(mapping);
+  });
+
+  app.delete("/api/admin/api-mappings/:id", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    await storage.deleteApiServiceMapping(Number(req.params.id));
+    res.sendStatus(204);
+  });
+
+  // === API Order Logs ===
+  app.get("/api/admin/api-logs", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const providerId = req.query.providerId ? Number(req.query.providerId) : undefined;
+    const orderId = req.query.orderId ? Number(req.query.orderId) : undefined;
+    const logs = await storage.getApiOrderLogs(providerId, orderId);
+    res.json(logs);
+  });
+
+  // === API Tokens ===
+  app.get("/api/admin/api-tokens", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const tokens = await storage.getApiTokens();
+    res.json(tokens);
+  });
+
+  app.post("/api/admin/api-tokens", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    try {
+      const token = generateApiToken();
+      const created = await storage.createApiToken({
+        userId: req.body.userId || req.user.id,
+        token,
+        name: req.body.name || "API Token",
+        isActive: true,
+        ipWhitelist: req.body.ipWhitelist || null,
+      });
+      res.status(201).json(created);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.patch("/api/admin/api-tokens/:id", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const token = await storage.updateApiToken(Number(req.params.id), req.body);
+    res.json(token);
+  });
+
+  app.delete("/api/admin/api-tokens/:id", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    await storage.deleteApiToken(Number(req.params.id));
+    res.sendStatus(204);
   });
 
   // === Accounting: Accounts (Chart of Accounts) ===

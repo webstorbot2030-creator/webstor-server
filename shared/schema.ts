@@ -78,6 +78,62 @@ export const settings = pgTable("settings", {
   adminWhatsapp: text("admin_whatsapp"),
 });
 
+// === API INTEGRATION TABLES ===
+
+export const apiProviders = pgTable("api_providers", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  providerType: text("provider_type").notNull().default("megacenter"),
+  baseUrl: text("base_url").notNull(),
+  username: text("username"),
+  password: text("password"),
+  apiToken: text("api_token"),
+  isActive: boolean("is_active").default(true),
+  webhookUrl: text("webhook_url"),
+  ipWhitelist: text("ip_whitelist"),
+  balance: numeric("balance", { precision: 15, scale: 2 }).default("0"),
+  currency: text("currency").default("USD"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const apiServiceMappings = pgTable("api_service_mappings", {
+  id: serial("id").primaryKey(),
+  providerId: integer("provider_id").references(() => apiProviders.id).notNull(),
+  localServiceId: integer("local_service_id").references(() => services.id).notNull(),
+  externalServiceId: text("external_service_id").notNull(),
+  externalServiceName: text("external_service_name"),
+  externalPrice: numeric("external_price", { precision: 15, scale: 2 }),
+  isActive: boolean("is_active").default(true),
+  autoForward: boolean("auto_forward").default(false),
+  requiredFields: text("required_fields"),
+});
+
+export const apiOrderLogs = pgTable("api_order_logs", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id").references(() => orders.id),
+  providerId: integer("provider_id").references(() => apiProviders.id).notNull(),
+  direction: text("direction").notNull().default("outgoing"),
+  requestData: text("request_data"),
+  responseData: text("response_data"),
+  externalOrderId: text("external_order_id"),
+  externalReference: text("external_reference"),
+  status: text("status").default("pending"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const apiTokens = pgTable("api_tokens", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  token: text("token").notNull().unique(),
+  name: text("name").notNull(),
+  isActive: boolean("is_active").default(true),
+  ipWhitelist: text("ip_whitelist"),
+  lastUsedAt: timestamp("last_used_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // === ACCOUNTING TABLES ===
 
 export const accounts = pgTable("accounts", {
@@ -184,6 +240,25 @@ export const usersRelations = relations(users, ({ many }) => ({
   orders: many(orders),
 }));
 
+export const apiProvidersRelations = relations(apiProviders, ({ many }) => ({
+  serviceMappings: many(apiServiceMappings),
+  orderLogs: many(apiOrderLogs),
+}));
+
+export const apiServiceMappingsRelations = relations(apiServiceMappings, ({ one }) => ({
+  provider: one(apiProviders, { fields: [apiServiceMappings.providerId], references: [apiProviders.id] }),
+  localService: one(services, { fields: [apiServiceMappings.localServiceId], references: [services.id] }),
+}));
+
+export const apiOrderLogsRelations = relations(apiOrderLogs, ({ one }) => ({
+  order: one(orders, { fields: [apiOrderLogs.orderId], references: [orders.id] }),
+  provider: one(apiProviders, { fields: [apiOrderLogs.providerId], references: [apiProviders.id] }),
+}));
+
+export const apiTokensRelations = relations(apiTokens, ({ one }) => ({
+  user: one(users, { fields: [apiTokens.userId], references: [users.id] }),
+}));
+
 export const accountsRelations = relations(accounts, ({ one, many }) => ({
   parent: one(accounts, { fields: [accounts.parentId], references: [accounts.id] }),
   journalLines: many(journalLines),
@@ -272,6 +347,22 @@ export type JournalLine = typeof journalLines.$inferSelect;
 export type InsertJournalLine = z.infer<typeof insertJournalLineSchema>;
 export type FundTransaction = typeof fundTransactions.$inferSelect;
 export type InsertFundTransaction = z.infer<typeof insertFundTransactionSchema>;
+
+// API Integration schemas
+export const insertApiProviderSchema = createInsertSchema(apiProviders).omit({ id: true, createdAt: true });
+export const insertApiServiceMappingSchema = createInsertSchema(apiServiceMappings).omit({ id: true });
+export const insertApiOrderLogSchema = createInsertSchema(apiOrderLogs).omit({ id: true, createdAt: true });
+export const insertApiTokenSchema = createInsertSchema(apiTokens).omit({ id: true, createdAt: true, lastUsedAt: true });
+
+// API Integration types
+export type ApiProvider = typeof apiProviders.$inferSelect;
+export type InsertApiProvider = z.infer<typeof insertApiProviderSchema>;
+export type ApiServiceMapping = typeof apiServiceMappings.$inferSelect;
+export type InsertApiServiceMapping = z.infer<typeof insertApiServiceMappingSchema>;
+export type ApiOrderLog = typeof apiOrderLogs.$inferSelect;
+export type InsertApiOrderLog = z.infer<typeof insertApiOrderLogSchema>;
+export type ApiToken = typeof apiTokens.$inferSelect;
+export type InsertApiToken = z.infer<typeof insertApiTokenSchema>;
 
 // Request types
 export type LoginRequest = { phoneNumber: string; password: string };
