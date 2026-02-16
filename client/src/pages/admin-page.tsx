@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useAllOrders, useUpdateOrderStatus } from "@/hooks/use-orders";
 import { useCategories, useCreateCategory, useDeleteCategory, useServices, useCreateService, useDeleteService, useAds, useCreateAd, useDeleteAd, useBanks, useCreateBank, useDeleteBank, useSettings, useUpdateSettings, useServiceGroups, useCreateServiceGroup, useDeleteServiceGroup, useAdminUsers, useUpdateUser, useUpdateServiceGroup, useUpdateService } from "@/hooks/use-store";
-import { Loader2, Trash2, Plus, Check, X, LayoutDashboard, ShoppingBag, Package, ListTree, Megaphone, Landmark, Settings, ExternalLink, ShieldAlert, Users, Power, Image, Link, Eye, EyeOff, UserCog, Wallet, BarChart3, Download, Filter, TrendingUp, Clock, UserPlus, DollarSign, Activity, KeyRound, Lock, Mail, MessageCircle, Crown, Upload, ImageIcon, Wrench } from "lucide-react";
+import { Loader2, Trash2, Plus, Check, X, LayoutDashboard, ShoppingBag, Package, ListTree, Megaphone, Landmark, Settings, ExternalLink, ShieldAlert, Users, Power, Image, Link, Eye, EyeOff, UserCog, Wallet, BarChart3, Download, Filter, TrendingUp, Clock, UserPlus, DollarSign, Activity, KeyRound, Lock, Mail, MessageCircle, Crown, Upload, ImageIcon, Wrench, Pencil, RotateCcw } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -33,7 +33,7 @@ export default function AdminPage() {
   if (isLoading || !user) return <div className="min-h-screen flex items-center justify-center bg-slate-950"><Loader2 className="animate-spin w-10 h-10 text-primary" /></div>;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 rtl" dir="rtl">
+    <div className="min-h-screen bg-slate-950 text-slate-200 rtl dark" dir="rtl">
       <div className="flex flex-col lg:flex-row min-h-screen">
         <aside className="w-full lg:w-64 bg-slate-900 border-l border-white/5 p-6 flex flex-col gap-8">
           <div className="flex items-center gap-3 px-2">
@@ -244,6 +244,11 @@ function OrdersManager() {
                            </DialogContent>
                          </Dialog>
                        </>
+                    )}
+                    {(order.status === 'completed' || order.status === 'rejected') && (
+                      <Button size="sm" className="bg-orange-600 hover:bg-orange-700 h-9 px-4 rounded-xl" onClick={() => handleStatus(order.id, 'pending')} data-testid={`button-reset-order-${order.id}`}>
+                        <RotateCcw className="w-4 h-4 ml-1" /> إعادة للمعالجة
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -1095,6 +1100,22 @@ function CategoriesManager() {
   const { mutate: createCat } = useCreateCategory();
   const { mutate: deleteCat } = useDeleteCategory();
   const [name, setName] = useState("");
+  const [editingCategory, setEditingCategory] = useState<any>(null);
+  const [editCatName, setEditCatName] = useState("");
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const handleEditCategory = async () => {
+    if (!editingCategory) return;
+    try {
+      await apiRequest("PATCH", `/api/categories/${editingCategory.id}`, { name: editCatName });
+      queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
+      toast({ title: "تم تحديث القسم" });
+      setEditingCategory(null);
+    } catch (e: any) {
+      toast({ title: e.message || "خطأ", variant: "destructive" });
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -1115,13 +1136,30 @@ function CategoriesManager() {
                 <LayoutDashboard className="w-8 h-8 text-primary" />
               </div>
               <span className="font-bold text-white text-lg">{c.name}</span>
-              <Button variant="ghost" size="sm" className="text-red-400 hover:bg-red-500/10 w-full mt-2" onClick={() => deleteCat(c.id)}>
-                <Trash2 className="w-4 h-4 mr-2" /> حذف
-              </Button>
+              <div className="flex gap-2 w-full mt-2">
+                <Button variant="ghost" size="sm" className="text-blue-400 hover:bg-blue-500/10 flex-1" onClick={() => { setEditingCategory(c); setEditCatName(c.name); }} data-testid={`button-edit-category-${c.id}`}>
+                  <Pencil className="w-4 h-4 mr-2" /> تعديل
+                </Button>
+                <Button variant="ghost" size="sm" className="text-red-400 hover:bg-red-500/10 flex-1" onClick={() => deleteCat(c.id)}>
+                  <Trash2 className="w-4 h-4 mr-2" /> حذف
+                </Button>
+              </div>
             </div>
           </Card>
         ))}
       </div>
+      <Dialog open={!!editingCategory} onOpenChange={(open) => !open && setEditingCategory(null)}>
+        <DialogContent className="bg-slate-900 border-white/10 text-white">
+          <DialogHeader><DialogTitle>تعديل القسم</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm text-slate-400">اسم القسم</label>
+              <Input value={editCatName} onChange={e => setEditCatName(e.target.value)} className="bg-black/20 border-white/10 h-12" data-testid="input-edit-category-name" />
+            </div>
+            <Button className="w-full bg-primary hover:bg-primary/90 h-12 rounded-xl" onClick={handleEditCategory} data-testid="button-save-category">حفظ التغييرات</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1136,6 +1174,22 @@ function AdsManager() {
   const [imageUrl, setImageUrl] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
   const [isUploading, setIsUploading] = useState(false);
+  const [editingAd, setEditingAd] = useState<any>(null);
+  const [editAdData, setEditAdData] = useState({ text: "", icon: "zap", imageUrl: "", linkUrl: "", adType: "text" });
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const handleEditAd = async () => {
+    if (!editingAd) return;
+    try {
+      await apiRequest("PATCH", `/api/ads/${editingAd.id}`, editAdData);
+      queryClient.invalidateQueries({ queryKey: ["/api/ads"] });
+      toast({ title: "تم تحديث الإعلان" });
+      setEditingAd(null);
+    } catch (e: any) {
+      toast({ title: e.message || "خطأ", variant: "destructive" });
+    }
+  };
 
   const handleAdImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1241,12 +1295,60 @@ function AdsManager() {
               </div>
               <span className="text-[10px] text-slate-600 px-2 py-0.5 rounded-full bg-white/5 shrink-0">{ad.adType === 'image' ? 'صورة' : 'نص'}</span>
             </div>
-            <Button variant="ghost" size="icon" className="text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={() => deleteAd(ad.id)}>
-              <Trash2 className="w-4 h-4" />
-            </Button>
+            <div className="flex gap-1 shrink-0">
+              <Button variant="ghost" size="icon" className="text-blue-400 hover:bg-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => { setEditingAd(ad); setEditAdData({ text: ad.text || "", icon: ad.icon || "zap", imageUrl: ad.imageUrl || "", linkUrl: ad.linkUrl || "", adType: ad.adType || "text" }); }} data-testid={`button-edit-ad-${ad.id}`}>
+                <Pencil className="w-4 h-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => deleteAd(ad.id)}>
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
           </Card>
         ))}
       </div>
+      <Dialog open={!!editingAd} onOpenChange={(open) => !open && setEditingAd(null)}>
+        <DialogContent className="bg-slate-900 border-white/10 text-white">
+          <DialogHeader><DialogTitle>تعديل الإعلان</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm text-slate-400">نوع الإعلان</label>
+              <select value={editAdData.adType} onChange={e => setEditAdData({ ...editAdData, adType: e.target.value })} className="w-full bg-black/20 border border-white/10 rounded-xl h-11 px-3 text-sm focus:border-primary outline-none" data-testid="select-edit-ad-type">
+                <option value="text" className="bg-slate-900">نص متحرك</option>
+                <option value="image" className="bg-slate-900">صورة إعلانية</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm text-slate-400">نص الإعلان</label>
+              <Input value={editAdData.text} onChange={e => setEditAdData({ ...editAdData, text: e.target.value })} className="bg-black/20 border-white/10 h-11" data-testid="input-edit-ad-text" />
+            </div>
+            {editAdData.adType === 'text' && (
+              <div className="space-y-2">
+                <label className="text-sm text-slate-400">الأيقونة</label>
+                <select value={editAdData.icon} onChange={e => setEditAdData({ ...editAdData, icon: e.target.value })} className="w-full bg-black/20 border border-white/10 rounded-xl h-11 px-3 text-white outline-none" data-testid="select-edit-ad-icon">
+                  <option value="zap" className="bg-slate-900">فلاش</option>
+                  <option value="star" className="bg-slate-900">مميز</option>
+                  <option value="crown" className="bg-slate-900">ملكي</option>
+                  <option value="gift" className="bg-slate-900">هدية</option>
+                  <option value="flame" className="bg-slate-900">ترند</option>
+                </select>
+              </div>
+            )}
+            {editAdData.adType === 'image' && (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm text-slate-400">رابط الصورة</label>
+                  <Input value={editAdData.imageUrl} onChange={e => setEditAdData({ ...editAdData, imageUrl: e.target.value })} className="bg-black/20 border-white/10 h-11" data-testid="input-edit-ad-image" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm text-slate-400">رابط عند الضغط</label>
+                  <Input value={editAdData.linkUrl} onChange={e => setEditAdData({ ...editAdData, linkUrl: e.target.value })} className="bg-black/20 border-white/10 h-11 font-mono" data-testid="input-edit-ad-link" />
+                </div>
+              </>
+            )}
+            <Button className="w-full bg-primary hover:bg-primary/90 h-12 rounded-xl" onClick={handleEditAd} data-testid="button-save-ad">حفظ التغييرات</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1256,6 +1358,22 @@ function BanksManager() {
   const { mutate: createBank } = useCreateBank();
   const { mutate: deleteBank } = useDeleteBank();
   const form = useForm({ defaultValues: { bankName: "", accountName: "", accountNumber: "", note: "" } });
+  const [editingBank, setEditingBank] = useState<any>(null);
+  const [editBankData, setEditBankData] = useState({ bankName: "", accountName: "", accountNumber: "", note: "" });
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const handleEditBank = async () => {
+    if (!editingBank) return;
+    try {
+      await apiRequest("PATCH", `/api/banks/${editingBank.id}`, editBankData);
+      queryClient.invalidateQueries({ queryKey: ["/api/banks"] });
+      toast({ title: "تم تحديث الحساب البنكي" });
+      setEditingBank(null);
+    } catch (e: any) {
+      toast({ title: e.message || "خطأ", variant: "destructive" });
+    }
+  };
 
   const onSubmit = (data: any) => {
     createBank(data, { onSuccess: () => form.reset() });
@@ -1291,9 +1409,14 @@ function BanksManager() {
         {banks?.map(bank => (
           <Card key={bank.id} className="bg-slate-900 border-white/5 p-6 relative group overflow-hidden hover:border-teal-500/30 transition-all">
             <div className="absolute -right-4 -top-4 w-24 h-24 bg-teal-500/5 rounded-full blur-2xl group-hover:bg-teal-500/10 transition-all" />
-            <Button variant="ghost" size="icon" className="absolute top-3 left-3 text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity z-10" onClick={() => deleteBank(bank.id)}>
-              <Trash2 className="w-4 h-4" />
-            </Button>
+            <div className="absolute top-3 left-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+              <Button variant="ghost" size="icon" className="text-blue-400 hover:bg-blue-500/10" onClick={() => { setEditingBank(bank); setEditBankData({ bankName: bank.bankName, accountName: bank.accountName, accountNumber: bank.accountNumber, note: bank.note || "" }); }} data-testid={`button-edit-bank-${bank.id}`}>
+                <Pencil className="w-4 h-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="text-red-400 hover:bg-red-500/10" onClick={() => deleteBank(bank.id)}>
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
             <div className="space-y-4 relative z-0">
               <div className="w-12 h-12 rounded-xl bg-teal-500/10 flex items-center justify-center text-teal-400 shadow-inner border border-teal-500/10">
                 <Landmark className="w-6 h-6" />
@@ -1308,6 +1431,30 @@ function BanksManager() {
           </Card>
         ))}
       </div>
+      <Dialog open={!!editingBank} onOpenChange={(open) => !open && setEditingBank(null)}>
+        <DialogContent className="bg-slate-900 border-white/10 text-white">
+          <DialogHeader><DialogTitle>تعديل الحساب البنكي</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-1.5">
+              <label className="text-xs text-slate-400">اسم البنك</label>
+              <Input value={editBankData.bankName} onChange={e => setEditBankData({ ...editBankData, bankName: e.target.value })} className="bg-black/20 border-white/10 h-11" data-testid="input-edit-bank-name" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs text-slate-400">اسم صاحب الحساب</label>
+              <Input value={editBankData.accountName} onChange={e => setEditBankData({ ...editBankData, accountName: e.target.value })} className="bg-black/20 border-white/10 h-11" data-testid="input-edit-account-name" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs text-slate-400">رقم الحساب</label>
+              <Input value={editBankData.accountNumber} onChange={e => setEditBankData({ ...editBankData, accountNumber: e.target.value })} className="bg-black/20 border-white/10 h-11 font-mono" data-testid="input-edit-account-number" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs text-slate-400">ملاحظة (اختياري)</label>
+              <Input value={editBankData.note} onChange={e => setEditBankData({ ...editBankData, note: e.target.value })} className="bg-black/20 border-white/10 h-11" data-testid="input-edit-bank-note" />
+            </div>
+            <Button className="w-full bg-primary hover:bg-primary/90 h-11 rounded-xl shadow-lg shadow-primary/20" onClick={handleEditBank} data-testid="button-save-bank">حفظ التغييرات</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

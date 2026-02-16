@@ -69,6 +69,17 @@ export async function registerRoutes(
     res.status(201).json(category);
   });
 
+  app.patch("/api/categories/:id", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const { name, icon, image } = req.body;
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = name;
+    if (icon !== undefined) updateData.icon = icon;
+    if (image !== undefined) updateData.image = image;
+    const category = await storage.updateCategory(Number(req.params.id), updateData);
+    res.json(category);
+  });
+
   app.delete(api.categories.delete.path, async (req, res) => {
     if (req.user?.role !== "admin") return res.sendStatus(403);
     await storage.deleteCategory(Number(req.params.id));
@@ -169,12 +180,16 @@ export async function registerRoutes(
   app.patch(api.orders.updateStatus.path, async (req, res) => {
     if (req.user?.role !== "admin") return res.sendStatus(403);
     const { status, rejectionReason } = req.body;
+    const existingOrder = await storage.getOrder(Number(req.params.id));
+    if (!existingOrder) return res.status(404).json({ message: "الطلب غير موجود" });
+    const previousStatus = existingOrder.status;
     const order = await storage.updateOrderStatus(Number(req.params.id), status, rejectionReason);
 
     try {
       const service = await storage.getService(order.serviceId);
       const serviceName = service?.name || `#${order.serviceId}`;
       const statusMessages: Record<string, { title: string; message: string; type: string }> = {
+        pending: { title: "تم إعادة طلبك", message: `طلبك رقم #${order.id} (${serviceName}) تمت إعادته للمعالجة`, type: "info" },
         processing: { title: "جاري تنفيذ طلبك", message: `طلبك رقم #${order.id} (${serviceName}) قيد التنفيذ الآن`, type: "info" },
         completed: { title: "تم تنفيذ طلبك بنجاح", message: `طلبك رقم #${order.id} (${serviceName}) تم تنفيذه بنجاح`, type: "success" },
         rejected: { title: "تم رفض طلبك", message: `طلبك رقم #${order.id} (${serviceName}) تم رفضه${rejectionReason ? ': ' + rejectionReason : ''}`, type: "error" },
@@ -191,6 +206,27 @@ export async function registerRoutes(
       }
     } catch (e) {
       console.error("Failed to create notification:", e);
+    }
+
+    if (status === "pending" && previousStatus === "rejected") {
+      try {
+        const service = await storage.getService(order.serviceId);
+        if (service) {
+          const user = await storage.getUser(order.userId);
+          if (user) {
+            const newBalance = (user.balance || 0) - service.price;
+            await storage.updateUserBalance(order.userId, newBalance);
+            await storage.createNotification({
+              userId: order.userId,
+              type: "info",
+              title: "تم خصم الرصيد",
+              message: `تم خصم ${service.price.toLocaleString()} ر.ي من رصيدك لإعادة معالجة الطلب #${order.id}. رصيدك الحالي: ${newBalance.toLocaleString()} ر.ي`,
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Failed to re-deduct balance on reset:", e);
+      }
     }
 
     if (status === "rejected") {
@@ -297,6 +333,18 @@ export async function registerRoutes(
     res.status(201).json(bank);
   });
 
+  app.patch("/api/banks/:id", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const { bankName, accountName, accountNumber, note } = req.body;
+    const updateData: any = {};
+    if (bankName !== undefined) updateData.bankName = bankName;
+    if (accountName !== undefined) updateData.accountName = accountName;
+    if (accountNumber !== undefined) updateData.accountNumber = accountNumber;
+    if (note !== undefined) updateData.note = note;
+    const bank = await storage.updateBank(Number(req.params.id), updateData);
+    res.json(bank);
+  });
+
   app.delete(api.banks.delete.path, async (req, res) => {
     if (req.user?.role !== "admin") return res.sendStatus(403);
     await storage.deleteBank(Number(req.params.id));
@@ -313,6 +361,20 @@ export async function registerRoutes(
     if (req.user?.role !== "admin") return res.sendStatus(403);
     const ad = await storage.createAd(req.body);
     res.status(201).json(ad);
+  });
+
+  app.patch("/api/ads/:id", async (req, res) => {
+    if (req.user?.role !== "admin") return res.sendStatus(403);
+    const { text, icon, active, imageUrl, linkUrl, adType } = req.body;
+    const updateData: any = {};
+    if (text !== undefined) updateData.text = text;
+    if (icon !== undefined) updateData.icon = icon;
+    if (active !== undefined) updateData.active = active;
+    if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
+    if (linkUrl !== undefined) updateData.linkUrl = linkUrl;
+    if (adType !== undefined) updateData.adType = adType;
+    const ad = await storage.updateAd(Number(req.params.id), updateData);
+    res.json(ad);
   });
 
   app.delete(api.ads.delete.path, async (req, res) => {
@@ -394,7 +456,18 @@ export async function registerRoutes(
     if (fullName !== undefined) updateData.fullName = fullName;
     if (email !== undefined) updateData.email = email;
     try {
+      const existingUser = await storage.getUser(Number(req.params.id));
       const user = await storage.updateUser(Number(req.params.id), updateData);
+
+      if (active === true && existingUser && !existingUser.active) {
+        await storage.createNotification({
+          userId: user.id,
+          type: "success",
+          title: "تم تفعيل حسابك",
+          message: "تمت الموافقة على حسابك من قبل الإدارة. يمكنك الآن تسجيل الدخول واستخدام المتجر.",
+        });
+      }
+
       res.json({ ...user, password: undefined });
     } catch (e: any) {
       if (e.code === "23505" && e.constraint?.includes("email")) {

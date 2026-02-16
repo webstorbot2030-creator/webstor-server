@@ -99,28 +99,56 @@ export function setupAuth(app: Express) {
         email: email || null,
         password: hashedPassword,
         role: "user",
+        active: false,
       });
 
-      req.login(user, (err) => {
-        if (err) return next(err);
-        res.status(201).json(user);
-      });
+      try {
+        const allUsers = await storage.getAllUsers();
+        const admins = allUsers.filter(u => u.role === "admin");
+        for (const admin of admins) {
+          await storage.createNotification({
+            userId: admin.id,
+            type: "info",
+            title: "حساب جديد بانتظار التفعيل",
+            message: `المستخدم ${fullName} (${phoneNumber || email}) سجل حساب جديد ويحتاج موافقة للتفعيل`,
+          });
+        }
+      } catch (e) {
+        console.error("Failed to notify admins about new registration:", e);
+      }
+
+      res.status(201).json({ ...user, needsApproval: true });
     } catch (err) {
       next(err);
     }
   });
 
-  app.post("/api/login", (req, res, next) => {
-    passport.authenticate("local", (err: any, user: any) => {
-      if (err) return next(err);
+  app.post("/api/login", async (req, res, next) => {
+    try {
+      const { identifier, password } = req.body;
+      let user;
+      if (identifier?.includes("@")) {
+        user = await storage.getUserByEmail(identifier);
+      } else {
+        user = await storage.getUserByPhoneNumber(identifier);
+      }
       if (!user) {
         return res.status(401).json({ message: "البريد/رقم الهاتف أو كلمة المرور غير صحيحة" });
+      }
+      const isValid = await comparePasswords(password, user.password);
+      if (!isValid) {
+        return res.status(401).json({ message: "البريد/رقم الهاتف أو كلمة المرور غير صحيحة" });
+      }
+      if (!user.active) {
+        return res.status(403).json({ message: "حسابك بانتظار موافقة الإدارة. يرجى الانتظار حتى يتم تفعيل حسابك." });
       }
       req.login(user, (err) => {
         if (err) return next(err);
         res.status(200).json(user);
       });
-    })(req, res, next);
+    } catch (err) {
+      next(err);
+    }
   });
 
   app.post("/api/logout", (req, res, next) => {

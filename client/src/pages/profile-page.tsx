@@ -121,12 +121,12 @@ export default function ProfilePage() {
           <Button variant="ghost" className="text-slate-400 hover:text-white" onClick={() => setLocation("/")} data-testid="button-back-home">
             <ArrowRight className="w-5 h-5" />
           </Button>
-          <h1 className="text-2xl font-bold text-white">الملف الشخصي</h1>
+          <h1 className="text-2xl font-bold dark:text-white text-gray-900">الملف الشخصي</h1>
         </div>
 
-        <Card className="bg-slate-900/80 border-white/5 backdrop-blur-sm">
+        <Card className="dark:bg-slate-900/80 bg-white/90 dark:border-white/5 border-gray-200 backdrop-blur-sm">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-white">
+            <CardTitle className="flex items-center gap-2 dark:text-white text-gray-900">
               <User className="w-5 h-5 text-primary" />
               معلومات الحساب
             </CardTitle>
@@ -134,10 +134,10 @@ export default function ProfilePage() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-xs text-slate-400 flex items-center gap-1">
+                <label className="text-xs dark:text-slate-400 text-gray-500 flex items-center gap-1">
                   <User className="w-3 h-3" /> الاسم الكامل
                 </label>
-                <div className="bg-black/30 border border-white/5 rounded-xl p-3 text-white" data-testid="text-profile-name">
+                <div className="dark:bg-black/30 bg-gray-50 border dark:border-white/5 border-gray-200 rounded-xl p-3 dark:text-white text-gray-900" data-testid="text-profile-name">
                   {user.fullName}
                 </div>
               </div>
@@ -198,7 +198,7 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-slate-900/80 border-white/5 backdrop-blur-sm" dir="rtl">
+        <Card className="dark:bg-slate-900/80 bg-white/90 dark:border-white/5 border-gray-200 backdrop-blur-sm" dir="rtl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-white">
               <Wallet className="w-5 h-5 text-green-400" />
@@ -294,7 +294,7 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-slate-900/80 border-white/5 backdrop-blur-sm">
+        <Card className="dark:bg-slate-900/80 bg-white/90 dark:border-white/5 border-gray-200 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-white">
               <Lock className="w-5 h-5 text-orange-400" />
